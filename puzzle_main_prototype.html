@@ -374,7 +374,7 @@
           <div class="result-icon" id="resultIcon">✓</div>
           <div class="result-copy">
             <h2 id="resultTitle">Pārbaude veiksmīga</h2>
-            <p id="resultMessage">Tu esi cilvēks!</p>
+            <p id="resultMessage">Tu esi uzvarējis!</p>
           </div>
         </div>
         </div>
@@ -1591,11 +1591,11 @@
       if (isHuman) {
         resultIcon.textContent = '✓';
         resultTitle.textContent = 'Pārbaude veiksmīga';
-        resultMessage.textContent = 'Tu esi cilvēks!';
+        resultMessage.textContent = 'Tu esi uzvarējis!';
       } else {
         resultIcon.textContent = '×';
         resultTitle.textContent = 'Pārbaude neizdevās';
-        resultMessage.textContent = 'Tu neesi cilvēks!';
+        resultMessage.textContent = 'Tu neesi uzvarējis!';
       }
     }
 
@@ -1612,9 +1612,9 @@
       submitBtn.disabled = true;
 
       if (isHuman) {
-        setStatus('Tu esi cilvēks!', 'ok');
+        setStatus('Tu esi uzvarējis!', 'ok');
       } else {
-        setStatus('Tu neesi cilvēks!', 'bad');
+        setStatus('Tu neesi uzvarējis!', 'bad');
       }
 
       showResultModal(isHuman);

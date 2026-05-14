@@ -684,7 +684,7 @@
         manifest: 'files.js',
         manifestKey: 'cover',
         promptFile: 'prompt.txt',
-        fallbackPrompt: 'Atzīmē visus laukumus, kas atbilst norādei.'
+        fallbackPrompt: 'Atzīmē visus laukumus, kas kuros ietilpst mopēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.'
       },
 
       CHECKBOX: {
@@ -920,7 +920,7 @@
 
       const prompt = await loadOptionalText(setup.folder, setup.promptFile);
       if (prompt) {
-        setInstructions(prompt);
+        setInstructions(prompt + ' Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.');
       }
 
       if (localGenerationId !== generationId || gameEnded) return;
