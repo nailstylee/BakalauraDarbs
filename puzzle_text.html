@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uzdevums</title>
+  <style>
+    :root {
+      --card-w: 720px;
+      --text: #202738;
+      --muted: #697389;
+      --border: #d8e0ef;
+      --primary: #3f72f7;
+      --primary-soft: #edf2ff;
+      --bad: #c84f5a;
+      --bad-bg: #ffe5e8;
+      --ok: #167d59;
+      --ok-bg: #def6ec;
+      --panel: rgba(255, 255, 255, 0.97);
+      --stage-bg: #f2f5fb;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(91, 123, 255, 0.15), transparent 24%),
+        radial-gradient(circle at 88% 13%, rgba(255, 209, 98, 0.14), transparent 18%),
+        linear-gradient(180deg, #eff3fb, #e7ecf6);
+      font-family: Inter, Arial, sans-serif;
+      color: var(--text);
+      padding: 18px;
+    }
+
+    .check-card {
+      width: min(100%, var(--card-w));
+      background: var(--panel);
+      border: 1px solid rgba(215, 223, 239, 0.97);
+      box-shadow: 0 22px 68px rgba(34, 49, 82, 0.17);
+      padding: 16px;
+    }
+
+    @media (min-width: 821px) {
+      .check-card {
+        zoom: 0.9;
+      }
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      font-weight: 750;
+    }
+
+    .instructions {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--stage-bg);
+    }
+
+    .startup-fallback {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: var(--stage-bg);
+      color: #42516f;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .startup-fallback strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #202738;
+      font-size: 18px;
+    }
+
+    .startup-fallback.hidden {
+      display: none;
+    }
+
+    .stage-loading,
+    .stage-message {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      color: #42516f;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .stage-message strong {
+      display: block;
+      color: var(--text);
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .attempts {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #f6f8ff;
+      color: #42516f;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status {
+      flex: 1 1 320px;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fbfcff;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 10px 12px;
+    }
+
+    .status.bad {
+      background: var(--bad-bg);
+      color: var(--bad);
+      border-color: #f2c1c6;
+    }
+
+    .status.ok {
+      background: var(--ok-bg);
+      color: var(--ok);
+      border-color: #bee8d6;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .image-grid {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 2px;
+      padding: 2px;
+      background: #d9e2f0;
+    }
+
+    .cover-grid {
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+    }
+
+    .image-cell {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #e9eef7;
+      cursor: pointer;
+      transform: none !important;
+    }
+
+    .image-cell img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .image-cell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 0 solid transparent;
+      box-shadow: inset 0 0 0 0 rgba(63, 114, 247, 0);
+      transition: box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .image-cell.selected::after {
+      background: rgba(63, 114, 247, 0.18);
+      box-shadow: inset 0 0 0 6px rgba(63, 114, 247, 0.95);
+    }
+
+    .image-cell.selected::before {
+      content: "✓";
+      position: absolute;
+      z-index: 2;
+      top: 10px;
+      right: 10px;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(63, 114, 247, 0.96);
+      color: white;
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .missing-cell {
+      display: grid;
+      place-items: center;
+      padding: 12px;
+      color: #697389;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.35;
+      background: #edf2fa;
+    }
+
+    .slide-layout {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      padding: 28px 28px 30px;
+    }
+
+    .slide-canvas-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+
+    .slide-canvas {
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+      border: 1px solid rgba(32, 39, 56, 0.12);
+      background: #dce4ef;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .slider-symbol {
+      flex: 0 0 auto;
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: #334362;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .slider-input {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+
+    .text-layout {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 34px;
+    }
+
+    .text-card {
+      width: min(100%, 520px);
+      padding: 24px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 18px 40px rgba(34, 49, 82, 0.12);
+    }
+
+    .text-image-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 190px;
+      padding: 16px;
+      border: 1px solid #d8e0ef;
+      background: #f7f9fd;
+      margin-bottom: 18px;
+    }
+
+    .text-image {
+      display: block;
+      max-width: 100%;
+      max-height: 240px;
+      object-fit: contain;
+    }
+
+    .answer-input {
+      width: 100%;
+      padding: 14px 15px;
+      border: 1px solid #cfd8eb;
+      border-radius: 12px;
+      background: white;
+      color: var(--text);
+      font: inherit;
+      font-size: 17px;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    .answer-input:focus {
+      outline: 2px solid rgba(63, 114, 247, 0.22);
+      border-color: var(--primary);
+    }
+
+    .check-layout {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 34px;
+    }
+
+    .check-panel {
+      width: min(100%, 460px);
+      padding: 28px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 18px 40px rgba(34, 49, 82, 0.12);
+    }
+
+    .check-label {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.4;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .check-input {
+      width: 30px;
+      height: 30px;
+      accent-color: var(--primary);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .result-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(24, 33, 53, 0.42);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+    }
+
+    .result-modal.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .result-card {
+      width: min(100%, 410px);
+      overflow: hidden;
+      border: 1px solid rgba(212, 221, 238, 0.98);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.99);
+      box-shadow: 0 28px 90px rgba(23, 35, 62, 0.34);
+      transform: translateY(12px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+
+    .result-modal.visible .result-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .result-topbar {
+      height: 8px;
+      background: linear-gradient(90deg, #3f72f7, #6b94ff);
+    }
+
+    .result-modal.failure .result-topbar {
+      background: linear-gradient(90deg, #c84f5a, #e67a83);
+    }
+
+    .result-body {
+      padding: 24px 24px 22px;
+    }
+
+    .result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .result-icon {
+      flex: 0 0 auto;
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #def6ec;
+      color: #167d59;
+      box-shadow: inset 0 0 0 1px rgba(22, 125, 89, 0.12);
+      font-size: 30px;
+      font-weight: 900;
+    }
+
+    .result-modal.failure .result-icon {
+      background: #ffe5e8;
+      color: #c84f5a;
+      box-shadow: inset 0 0 0 1px rgba(200, 79, 90, 0.12);
+    }
+
+    .result-copy h2 {
+      margin: 2px 0 7px;
+      color: #202738;
+      font-size: 22px;
+      line-height: 1.18;
+      font-weight: 820;
+    }
+
+    .result-copy p {
+      margin: 0;
+      color: #697389;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 10px;
+      }
+
+      .check-card {
+        padding: 12px;
+      }
+
+      .head {
+        margin-bottom: 10px;
+      }
+
+      .bottom {
+        gap: 10px;
+      }
+
+      .status {
+        flex-basis: 100%;
+      }
+
+      .buttons {
+        width: 100%;
+      }
+
+      .primary {
+        width: 100%;
+      }
+
+      .slide-layout {
+        padding: 18px 18px 22px;
+        gap: 14px;
+      }
+
+      .text-layout,
+      .check-layout {
+        padding: 20px;
+      }
+
+      .text-card,
+      .check-panel {
+        padding: 18px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .result-body {
+        padding: 21px 18px 18px;
+      }
+
+      .result-row {
+        gap: 13px;
+      }
+
+      .result-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 27px;
+      }
+
+      .result-copy h2 {
+        font-size: 20px;
+      }
+
+      .image-cell.selected::before {
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        font-size: 19px;
+      }
+
+      .check-label {
+        font-size: 17px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="check-card">
+    <div class="head">
+      <div>
+        <h1>Uzdevums</h1>
+        <p class="instructions" id="instructionsBox">Uzdevums tiek sagatavots.</p>
+      </div>
+    </div>
+
+    <div class="stage" id="challengeStage">
+      <div class="startup-fallback" id="startupFallback">
+        <div>
+          <strong>Interaktīvā pārbaude netika palaista.</strong>
+          Atver šo lapu pilnā pārlūkā vai kā publicētu tīmekļa lapu, nevis faila priekšskatījumā.
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="attempts" id="attemptsBadge">Mēģinājumi: 3</div>
+      <div class="status" id="statusBox">Uzdevums tiek sagatavots.</div>
+      <div class="buttons">
+        <button id="submitBtn" class="primary" disabled>Pārbaudīt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-modal" id="resultModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <div class="result-card">
+      <div class="result-topbar"></div>
+      <div class="result-body">
+        <div class="result-row">
+          <div class="result-icon" id="resultIcon">✓</div>
+          <div class="result-copy">
+            <h2 id="resultTitle">Pārbaude veiksmīga</h2>
+            <p id="resultMessage">Tu esi uzvarējis!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CONFIG = {
+      ATTEMPTS_PER_ROUND: 3,
+      MAX_FAILED_ROUNDS: 2,
+      ALLOWED_TYPES: [
+        'text'
+      ],
+
+      TEXT: {
+        folder: './text/',
+        manifest: 'files.js',
+        manifestKey: 'text',
+        prompt: 'Ieraksti attēlā redzamo tekstu.',
+        caseSensitive: false
+      },
+
+      SLIDE: {
+        folder: './slide/',
+        manifest: 'files.js',
+        manifestKey: 'slide',
+        prompt: 'Pabīdi detaļu tā, lai attēls sakristu.',
+        canvasWidth: 620,
+        canvasHeight: 470,
+        pieceSize: 96,
+        holeMargin: 42,
+        tolerancePx: 14
+      },
+
+      CHOOSE: {
+        folder: './choose/',
+        manifest: 'files.js',
+        manifestKey: 'choose',
+        prompt: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms.',
+        correctPrefix: 'correct',
+        wrongPrefix: 'wrong',
+        correctCounts: [4, 5]
+      },
+
+      COVER: {
+        folder: './cover/',
+        manifest: 'files.js',
+        manifestKey: 'cover',
+        promptFile: 'prompt.txt',
+        fallbackPrompt: 'Atzīmē visus laukumus, kas atbilst norādei.'
+      },
+
+      CHECKBOX: {
+        prompt: 'Atzīmē rūtiņu, lai turpinātu.',
+        label: 'Apstiprinu izvēli'
+      }
+    };
+
+    const stage = document.getElementById('challengeStage');
+    const startupFallback = document.getElementById('startupFallback');
+    const instructionsBox = document.getElementById('instructionsBox');
+    const attemptsBadge = document.getElementById('attemptsBadge');
+    const statusBox = document.getElementById('statusBox');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultModal = document.getElementById('resultModal');
+    const resultIcon = document.getElementById('resultIcon');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
+
+    if (startupFallback) {
+      startupFallback.classList.add('hidden');
+    }
+
+    let currentChallenge = null;
+    let attemptsUsed = 0;
+    let failedRounds = 0;
+    let gameEnded = false;
+    let generationId = 0;
+
+    function rand(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function randInt(min, max) {
+      return Math.floor(rand(min, max + 1));
+    }
+
+    function choice(list) {
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function shuffle(list) {
+      const copy = list.slice();
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = copy[i];
+        copy[i] = copy[j];
+        copy[j] = temp;
+      }
+      return copy;
+    }
+
+    function sample(list, count) {
+      return shuffle(list).slice(0, count);
+    }
+
+    function uniqueValues(list) {
+      return Array.from(new Set(list));
+    }
+
+    function setStatus(text, kind) {
+      statusBox.textContent = text;
+      statusBox.className = 'status';
+      if (kind === 'bad') statusBox.classList.add('bad');
+      if (kind === 'ok') statusBox.classList.add('ok');
+    }
+
+    function updateAttempts() {
+      attemptsBadge.textContent = 'Mēģinājumi: ' + Math.max(0, CONFIG.ATTEMPTS_PER_ROUND - attemptsUsed);
+    }
+
+    function showLoading(message) {
+      stage.innerHTML = '<div class="stage-loading">' + escapeHtml(message) + '</div>';
+      submitBtn.disabled = true;
+    }
+
+    function showStageMessage(title, message) {
+      stage.innerHTML =
+        '<div class="stage-message"><div><strong>' +
+        escapeHtml(title) +
+        '</strong>' +
+        escapeHtml(message) +
+        '</div></div>';
+      submitBtn.disabled = true;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function setReadyChallenge(challenge) {
+      currentChallenge = challenge;
+      submitBtn.disabled = false;
+    }
+
+    function setInstructions(text) {
+      instructionsBox.textContent = text;
+    }
+
+    function normalizePath(folder, file) {
+      const prefix = folder.endsWith('/') ? folder : folder + '/';
+      return prefix + file;
+    }
+
+    function baseName(path) {
+      return String(path).split('/').pop().split('?')[0].split('#')[0];
+    }
+
+    function fileStem(path) {
+      return baseName(path).replace(/\.[^.]+$/, '');
+    }
+
+    const manifestCache = new Map();
+
+    function getManifestStore() {
+      if (!window.VERIFICATION_FILE_LISTS) {
+        window.VERIFICATION_FILE_LISTS = {};
+      }
+      return window.VERIFICATION_FILE_LISTS;
+    }
+
+    function loadScript(url) {
+      return new Promise(function(resolve, reject) {
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = function() {
+          resolve();
+        };
+        script.onerror = function() {
+          reject(new Error('Manifest script failed to load: ' + url));
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function loadManifest(folder, manifestName, manifestKey) {
+      const url = normalizePath(folder, manifestName);
+      const cacheKey = manifestKey + '::' + url;
+
+      if (manifestCache.has(cacheKey)) {
+        return manifestCache.get(cacheKey);
+      }
+
+      const promise = (async function() {
+        const store = getManifestStore();
+
+        if (!Array.isArray(store[manifestKey])) {
+          await loadScript(url);
+        }
+
+        const files = store[manifestKey];
+        if (!Array.isArray(files)) {
+          throw new Error('Manifest did not define VERIFICATION_FILE_LISTS.' + manifestKey);
+        }
+
+        return files
+          .map(function(item) { return String(item).trim(); })
+          .filter(function(item) { return Boolean(item); });
+      })();
+
+      manifestCache.set(cacheKey, promise);
+      return promise;
+    }
+
+    async function loadOptionalText(folder, fileName) {
+      const url = normalizePath(folder, fileName);
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) return null;
+        const text = await response.text();
+        const trimmed = text.trim();
+        return trimmed || null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function loadImage(url) {
+      return new Promise(function(resolve, reject) {
+        const image = new Image();
+        image.onload = function() {
+          resolve(image);
+        };
+        image.onerror = function() {
+          reject(new Error('Image failed to load: ' + url));
+        };
+        image.src = url;
+      });
+    }
+
+    function selectedSetEquals(selected, correct) {
+      if (selected.size !== correct.size) return false;
+      for (const value of selected) {
+        if (!correct.has(value)) return false;
+      }
+      return true;
+    }
+
+    function parseCoverFile(fileName) {
+      const match = /^(1[0-6]|[1-9])_(correct|wrong)(?:[_.-]|$)/i.exec(baseName(fileName));
+      if (!match) return null;
+
+      return {
+        index: Number(match[1]),
+        correct: match[2].toLowerCase() === 'correct',
+        fileName: fileName
+      };
+    }
+
+    async function createCoverChallenge(localGenerationId) {
+      const setup = CONFIG.COVER;
+      setInstructions(setup.fallbackPrompt);
+      showLoading('Attēli tiek ielādēti.');
+
+      let files = [];
+      try {
+        files = await loadManifest(setup.folder, setup.manifest, setup.manifestKey);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage(
+          'Trūkst cover failu saraksta.',
+          'Pievieno cover/files.js ar 16 attēlu failu nosaukumiem.'
+        );
+        setStatus('Nav ielādēta attēlu kopa.', 'bad');
+        return;
+      }
+
+      const prompt = await loadOptionalText(setup.folder, setup.promptFile);
+      if (prompt) {
+        setInstructions(prompt);
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      const parsed = files
+        .map(parseCoverFile)
+        .filter(function(item) { return Boolean(item); });
+
+      const byIndex = new Map();
+      parsed.forEach(function(item) {
+        if (!byIndex.has(item.index)) {
+          byIndex.set(item.index, item);
+        }
+      });
+
+      const ordered = [];
+      for (let index = 1; index <= 16; index++) {
+        if (!byIndex.has(index)) {
+          showStageMessage(
+            'Cover kopa nav pilna.',
+            'Failu nosaukumiem jāiet no 1 līdz 16, piemēram, 1_correct.jpg vai 14_wrong.png.'
+          );
+          setStatus('Nepilnīga attēlu kopa.', 'bad');
+          return;
+        }
+        ordered.push(byIndex.get(index));
+      }
+
+      const loaded = await Promise.all(
+        ordered.map(function(item) {
+          const url = normalizePath(setup.folder, item.fileName);
+          return loadImage(url)
+            .then(function(image) {
+              return {
+                image: image,
+                index: item.index,
+                correct: item.correct
+              };
+            })
+            .catch(function() {
+              return {
+                image: null,
+                index: item.index,
+                correct: item.correct,
+                missing: true
+              };
+            });
+        })
+      );
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (loaded.some(function(item) { return item.missing; })) {
+        showStageMessage(
+          'Daži cover attēli nav atrasti.',
+          'Pārbaudi cover/files.js un failu nosaukumus.'
+        );
+        setStatus('Nepilnīga attēlu kopa.', 'bad');
+        return;
+      }
+
+      const correct = new Set(
+        loaded
+          .filter(function(item) { return item.correct; })
+          .map(function(item) { return item.index; })
+      );
+
+      const selected = new Set();
+      const grid = document.createElement('div');
+      grid.className = 'image-grid cover-grid';
+
+      loaded
+        .sort(function(a, b) { return a.index - b.index; })
+        .forEach(function(item) {
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'image-cell';
+          cell.dataset.index = String(item.index);
+
+          const image = document.createElement('img');
+          image.src = item.image.src;
+          image.alt = '';
+          cell.appendChild(image);
+
+          cell.addEventListener('click', function() {
+            const value = Number(cell.dataset.index);
+            if (selected.has(value)) {
+              selected.delete(value);
+              cell.classList.remove('selected');
+            } else {
+              selected.add(value);
+              cell.classList.add('selected');
+            }
+          });
+
+          grid.appendChild(cell);
+        });
+
+      stage.innerHTML = '';
+      stage.appendChild(grid);
+
+      setStatus('Atzīmē visus atbilstošos laukumus.', 'neutral');
+      setReadyChallenge({
+        type: 'cover',
+        validate: function() {
+          return selectedSetEquals(selected, correct);
+        }
+      });
+    }
+
+    async function createChooseChallenge(localGenerationId) {
+      const setup = CONFIG.CHOOSE;
+      setInstructions(setup.prompt);
+      showLoading('Attēli tiek ielādēti.');
+
+      let files = [];
+      try {
+        files = await loadManifest(setup.folder, setup.manifest, setup.manifestKey);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage(
+          'Trūkst choose failu saraksta.',
+          'Pievieno choose/files.js ar pareizo un nepareizo attēlu failu nosaukumiem.'
+        );
+        setStatus('Nav ielādēta attēlu kopa.', 'bad');
+        return;
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      const correctPrefix = String(setup.correctPrefix || 'correct').toLowerCase();
+      const wrongPrefix = String(setup.wrongPrefix || 'wrong').toLowerCase();
+
+      const correctFiles = uniqueValues(files.filter(function(file) {
+        return fileStem(file).toLowerCase().startsWith(correctPrefix);
+      }));
+
+      const wrongFiles = uniqueValues(files.filter(function(file) {
+        return fileStem(file).toLowerCase().startsWith(wrongPrefix);
+      }));
+
+      const allowedCorrectCounts = (setup.correctCounts || [4, 5]).filter(function(value) {
+        return value > 0 &&
+          value < 9 &&
+          correctFiles.length >= value &&
+          wrongFiles.length >= 9 - value;
+      });
+
+      if (!allowedCorrectCounts.length) {
+        showStageMessage(
+          'Choose kopa nav līdzsvarota.',
+          'Vajag pietiekami daudz correct... un wrong... failu, lai izveidotu 9 laukumu uzdevumu.'
+        );
+        setStatus('Nepietiek līdzsvarotu attēlu.', 'bad');
+        return;
+      }
+
+      const correctCount = choice(allowedCorrectCounts);
+      const wrongCount = 9 - correctCount;
+
+      const cells = shuffle(
+        sample(correctFiles, correctCount).map(function(file) {
+          return {
+            url: normalizePath(setup.folder, file),
+            correct: true
+          };
+        }).concat(
+          sample(wrongFiles, wrongCount).map(function(file) {
+            return {
+              url: normalizePath(setup.folder, file),
+              correct: false
+            };
+          })
+        )
+      );
+
+      const loaded = await Promise.all(
+        cells.map(function(cell) {
+          return loadImage(cell.url)
+            .then(function(image) {
+              return { image: image, correct: cell.correct, url: cell.url };
+            })
+            .catch(function() {
+              return { image: null, correct: cell.correct, url: cell.url, missing: true };
+            });
+        })
+      );
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (loaded.some(function(item) { return item.missing; })) {
+        showStageMessage(
+          'Daži attēli nav atrasti.',
+          'Pārbaudi choose/files.js un failu nosaukumus.'
+        );
+        setStatus('Nepilnīga attēlu kopa.', 'bad');
+        return;
+      }
+
+      const selected = new Set();
+      const correct = new Set();
+      const grid = document.createElement('div');
+      grid.className = 'image-grid';
+
+      loaded.forEach(function(item, index) {
+        const oneBasedIndex = index + 1;
+        if (item.correct) correct.add(oneBasedIndex);
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'image-cell';
+        cell.dataset.index = String(oneBasedIndex);
+
+        const image = document.createElement('img');
+        image.src = item.image.src;
+        image.alt = '';
+        cell.appendChild(image);
+
+        cell.addEventListener('click', function() {
+          const value = Number(cell.dataset.index);
+          if (selected.has(value)) {
+            selected.delete(value);
+            cell.classList.remove('selected');
+          } else {
+            selected.add(value);
+            cell.classList.add('selected');
+          }
+        });
+
+        grid.appendChild(cell);
+      });
+
+      stage.innerHTML = '';
+      stage.appendChild(grid);
+
+      setStatus('Atzīmē visus laukumus, kas atbilst norādei.', 'neutral');
+      setReadyChallenge({
+        type: 'choose',
+        validate: function() {
+          return selectedSetEquals(selected, correct);
+        }
+      });
+    }
+
+    function drawCover(ctx, image, width, height) {
+      const imageRatio = image.width / image.height;
+      const canvasRatio = width / height;
+      let drawWidth = width;
+      let drawHeight = height;
+      let drawX = 0;
+      let drawY = 0;
+
+      if (imageRatio > canvasRatio) {
+        drawHeight = height;
+        drawWidth = height * imageRatio;
+        drawX = (width - drawWidth) / 2;
+      } else {
+        drawWidth = width;
+        drawHeight = width / imageRatio;
+        drawY = (height - drawHeight) / 2;
+      }
+
+      ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    }
+
+    function drawPiecePath(ctx, x, y, size) {
+      const notch = size * 0.18;
+      const half = size * 0.5;
+      const q = size * 0.25;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y + q);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + q, y);
+      ctx.bezierCurveTo(x + q, y - notch, x + half - notch, y - notch, x + half, y);
+      ctx.bezierCurveTo(x + half + notch, y - notch, x + size - q, y - notch, x + size - q, y);
+      ctx.lineTo(x + size, y);
+      ctx.lineTo(x + size, y + q);
+      ctx.bezierCurveTo(x + size + notch, y + q, x + size + notch, y + half - notch, x + size, y + half);
+      ctx.bezierCurveTo(x + size + notch, y + half + notch, x + size + notch, y + size - q, x + size, y + size - q);
+      ctx.lineTo(x + size, y + size);
+      ctx.lineTo(x + size - q, y + size);
+      ctx.bezierCurveTo(x + size - q, y + size + notch, x + half + notch, y + size + notch, x + half, y + size);
+      ctx.bezierCurveTo(x + half - notch, y + size + notch, x + q, y + size + notch, x + q, y + size);
+      ctx.lineTo(x, y + size);
+      ctx.lineTo(x, y + size - q);
+      ctx.bezierCurveTo(x - notch, y + size - q, x - notch, y + half + notch, x, y + half);
+      ctx.bezierCurveTo(x - notch, y + half - notch, x - notch, y + q, x, y + q);
+      ctx.closePath();
+    }
+
+    async function createSliderChallenge(localGenerationId) {
+      const setup = CONFIG.SLIDE;
+      setInstructions(setup.prompt);
+      showLoading('Attēls tiek ielādēts.');
+
+      let files = [];
+      try {
+        files = await loadManifest(setup.folder, setup.manifest, setup.manifestKey);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage('Trūkst slide failu saraksta.', 'Pievieno slide/files.js ar attēlu failu nosaukumiem.');
+        setStatus('Nav ielādēta attēlu kopa.', 'bad');
+        return;
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (!files.length) {
+        showStageMessage('Slide kopa ir tukša.', 'Pievieno vismaz vienu attēlu slide/files.js sarakstā.');
+        setStatus('Nav atrasts attēls.', 'bad');
+        return;
+      }
+
+      let image = null;
+      let chosenPath = null;
+      const shuffledFiles = shuffle(files.map(function(file) {
+        return normalizePath(setup.folder, file);
+      }));
+
+      for (let i = 0; i < shuffledFiles.length; i++) {
+        try {
+          image = await loadImage(shuffledFiles[i]);
+          chosenPath = shuffledFiles[i];
+          break;
+        } catch (error) {
+        }
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (!image) {
+        showStageMessage('Attēls nav atrasts.', 'Pārbaudi slide/files.js un failu nosaukumus.');
+        setStatus('Nav ielādēts attēls.', 'bad');
+        return;
+      }
+
+      const layout = document.createElement('div');
+      layout.className = 'slide-layout';
+
+      const canvasWrap = document.createElement('div');
+      canvasWrap.className = 'slide-canvas-wrap';
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'slide-canvas';
+      canvas.width = setup.canvasWidth;
+      canvas.height = setup.canvasHeight;
+
+      const sliderRow = document.createElement('div');
+      sliderRow.className = 'slider-row';
+
+      const symbol = document.createElement('div');
+      symbol.className = 'slider-symbol';
+      symbol.textContent = '↔';
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.className = 'slider-input';
+      slider.min = '0';
+      slider.max = '1000';
+      slider.step = '1';
+
+      sliderRow.appendChild(symbol);
+      sliderRow.appendChild(slider);
+      canvasWrap.appendChild(canvas);
+      layout.appendChild(canvasWrap);
+      layout.appendChild(sliderRow);
+
+      stage.innerHTML = '';
+      stage.appendChild(layout);
+
+      const ctx = canvas.getContext('2d');
+      const renderedImage = document.createElement('canvas');
+      renderedImage.width = canvas.width;
+      renderedImage.height = canvas.height;
+      const renderedCtx = renderedImage.getContext('2d');
+      drawCover(renderedCtx, image, renderedImage.width, renderedImage.height);
+
+      const pieceSize = setup.pieceSize;
+      const holeMargin = setup.holeMargin;
+      const pieceY = randInt(holeMargin + 18, canvas.height - pieceSize - holeMargin - 18);
+      const targetX = randInt(holeMargin + pieceSize, canvas.width - pieceSize - holeMargin);
+      const minPieceX = holeMargin;
+      const maxPieceX = canvas.width - pieceSize - holeMargin;
+
+      function pieceXFromSlider() {
+        const ratio = Number(slider.value) / 1000;
+        return minPieceX + (maxPieceX - minPieceX) * ratio;
+      }
+
+      function sliderValueForX(x) {
+        return Math.round(((x - minPieceX) / (maxPieceX - minPieceX)) * 1000);
+      }
+
+      const initialCandidateX = Math.abs(targetX - minPieceX) > Math.abs(targetX - maxPieceX) ? minPieceX : maxPieceX;
+      slider.value = String(sliderValueForX(initialCandidateX));
+
+      function redraw() {
+        const currentX = pieceXFromSlider();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(renderedImage, 0, 0);
+
+        ctx.save();
+        drawPiecePath(ctx, targetX, pieceY, pieceSize);
+        ctx.fillStyle = 'rgba(25, 34, 52, 0.52)';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.86)';
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        drawPiecePath(ctx, currentX, pieceY, pieceSize);
+        ctx.clip();
+        ctx.drawImage(renderedImage, currentX - targetX, 0);
+        ctx.restore();
+
+        ctx.save();
+        drawPiecePath(ctx, currentX, pieceY, pieceSize);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.shadowColor = 'rgba(20, 30, 50, 0.38)';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      slider.addEventListener('input', redraw);
+      redraw();
+
+      setStatus('Pabīdi detaļu un spied “Pārbaudīt”.', 'neutral');
+      setReadyChallenge({
+        type: 'slide',
+        imagePath: chosenPath,
+        validate: function() {
+          return Math.abs(pieceXFromSlider() - targetX) <= setup.tolerancePx;
+        }
+      });
+    }
+
+    function answerFromImagePath(path) {
+      return decodeURIComponent(fileStem(path));
+    }
+
+    async function createTextImageChallenge(localGenerationId) {
+      const setup = CONFIG.TEXT;
+      setInstructions(setup.prompt);
+      showLoading('Attēls tiek ielādēts.');
+
+      let files = [];
+      try {
+        files = await loadManifest(setup.folder, setup.manifest, setup.manifestKey);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage('Trūkst text failu saraksta.', 'Pievieno text/files.js ar teksta attēlu failu nosaukumiem.');
+        setStatus('Nav ielādēta attēlu kopa.', 'bad');
+        return;
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (!files.length) {
+        showStageMessage('Text kopa ir tukša.', 'Pievieno vismaz vienu attēlu text/files.js sarakstā.');
+        setStatus('Nav atrasts attēls.', 'bad');
+        return;
+      }
+
+      let image = null;
+      let chosenPath = null;
+      const shuffledFiles = shuffle(files.map(function(file) {
+        return normalizePath(setup.folder, file);
+      }));
+
+      for (let i = 0; i < shuffledFiles.length; i++) {
+        try {
+          image = await loadImage(shuffledFiles[i]);
+          chosenPath = shuffledFiles[i];
+          break;
+        } catch (error) {
+        }
+      }
+
+      if (localGenerationId !== generationId || gameEnded) return;
+
+      if (!image) {
+        showStageMessage('Attēls nav atrasts.', 'Pārbaudi text/files.js un failu nosaukumus.');
+        setStatus('Nav ielādēts attēls.', 'bad');
+        return;
+      }
+
+      const answer = answerFromImagePath(chosenPath);
+      const layout = document.createElement('div');
+      layout.className = 'text-layout';
+
+      const card = document.createElement('div');
+      card.className = 'text-card';
+
+      const imageWrap = document.createElement('div');
+      imageWrap.className = 'text-image-wrap';
+
+      const imageElement = document.createElement('img');
+      imageElement.className = 'text-image';
+      imageElement.src = image.src;
+      imageElement.alt = '';
+      imageWrap.appendChild(imageElement);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'answer-input';
+      input.placeholder = 'Ieraksti tekstu';
+      input.autocomplete = 'off';
+      input.autocapitalize = 'none';
+      input.spellcheck = false;
+
+      card.appendChild(imageWrap);
+      card.appendChild(input);
+      layout.appendChild(card);
+
+      stage.innerHTML = '';
+      stage.appendChild(layout);
+
+      input.focus();
+
+      setStatus('Ieraksti tekstu un spied “Pārbaudīt”.', 'neutral');
+      setReadyChallenge({
+        type: 'text',
+        validate: function() {
+          const typed = input.value.trim();
+          if (setup.caseSensitive) {
+            return typed === answer;
+          }
+          return typed.toLowerCase() === answer.toLowerCase();
+        }
+      });
+    }
+
+    function createCheckboxChallenge() {
+      const setup = CONFIG.CHECKBOX;
+      setInstructions(setup.prompt);
+
+      const layout = document.createElement('div');
+      layout.className = 'check-layout';
+
+      const panel = document.createElement('div');
+      panel.className = 'check-panel';
+
+      const label = document.createElement('label');
+      label.className = 'check-label';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.className = 'check-input';
+
+      const text = document.createElement('span');
+      text.textContent = setup.label;
+
+      label.appendChild(input);
+      label.appendChild(text);
+      panel.appendChild(label);
+      layout.appendChild(panel);
+
+      stage.innerHTML = '';
+      stage.appendChild(layout);
+
+      setStatus('Atzīmē rūtiņu un spied “Pārbaudīt”.', 'neutral');
+      setReadyChallenge({
+        type: 'checkbox',
+        validate: function() {
+          return input.checked;
+        }
+      });
+    }
+
+    async function createRandomChallenge(localGenerationId) {
+      const allowed = CONFIG.ALLOWED_TYPES || [];
+      if (!allowed.length) {
+        showStageMessage('Nav konfigurētu uzdevumu.', 'Pievieno vismaz vienu uzdevuma tipu.');
+        setStatus('Nav pieejamu uzdevumu.', 'bad');
+        return;
+      }
+
+      const type = choice(allowed);
+
+      if (type === 'cover') {
+        await createCoverChallenge(localGenerationId);
+        return;
+      }
+
+      if (type === 'choose') {
+        await createChooseChallenge(localGenerationId);
+        return;
+      }
+
+      if (type === 'slide') {
+        await createSliderChallenge(localGenerationId);
+        return;
+      }
+
+      if (type === 'text') {
+        await createTextImageChallenge(localGenerationId);
+        return;
+      }
+
+      if (type === 'checkbox') {
+        createCheckboxChallenge();
+        return;
+      }
+
+      showStageMessage('Nezināms uzdevuma tips.', 'Pārbaudi CONFIG.ALLOWED_TYPES vērtības.');
+      setStatus('Uzdevumu nevar ielādēt.', 'bad');
+    }
+
+    function startNewRound(message) {
+      attemptsUsed = 0;
+      currentChallenge = null;
+      submitBtn.disabled = true;
+      updateAttempts();
+      setStatus(message || 'Uzdevums tiek sagatavots.', 'neutral');
+      generationId += 1;
+      createRandomChallenge(generationId);
+    }
+
+    function showResultModal(isHuman) {
+      resultModal.classList.toggle('failure', !isHuman);
+      resultModal.classList.add('visible');
+      resultModal.setAttribute('aria-hidden', 'false');
+
+      if (isHuman) {
+        resultIcon.textContent = '✓';
+        resultTitle.textContent = 'Pārbaude veiksmīga';
+        resultMessage.textContent = 'Tu esi uzvarējis!';
+      } else {
+        resultIcon.textContent = '×';
+        resultTitle.textContent = 'Pārbaude neizdevās';
+        resultMessage.textContent = 'Tu neesi uzvarējis!';
+      }
+    }
+
+    function endGame(isHuman) {
+      gameEnded = true;
+      submitBtn.disabled = true;
+
+      if (isHuman) {
+        setStatus('Tu esi uzvarējis!', 'ok');
+      } else {
+        setStatus('Tu neesi uzvarējis!', 'bad');
+      }
+
+      showResultModal(isHuman);
+    }
+
+    function failAttempt() {
+      attemptsUsed += 1;
+      updateAttempts();
+
+      const remaining = CONFIG.ATTEMPTS_PER_ROUND - attemptsUsed;
+      if (remaining > 0) {
+        const attemptWord = remaining === 1 ? 'mēģinājums' : 'mēģinājumi';
+        setStatus('Nepareizi. Atlikuši ' + remaining + ' ' + attemptWord + '.', 'bad');
+        return;
+      }
+
+      endGame(false);
+    }
+
+    function checkCurrentChallenge() {
+      if (gameEnded || !currentChallenge) return;
+
+      let passed = false;
+      try {
+        passed = Boolean(currentChallenge.validate());
+      } catch (error) {
+        passed = false;
+      }
+
+      if (passed) {
+        endGame(true);
+      } else {
+        failAttempt();
+      }
+    }
+
+    submitBtn.addEventListener('click', checkCurrentChallenge);
+
+    startNewRound('Uzdevums tiek sagatavots.');
+  </script>
+</body>
+</html>

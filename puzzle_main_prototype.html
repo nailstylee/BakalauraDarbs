@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ēnu puzle</title>
+  <style>
+    :root {
+      --card-w: 720px;
+      --text: #202738;
+      --muted: #697389;
+      --border: #d8e0ef;
+      --primary: #3f72f7;
+      --bad: #c84f5a;
+      --bad-bg: #ffe5e8;
+      --ok: #167d59;
+      --ok-bg: #def6ec;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(91, 123, 255, 0.15), transparent 24%),
+        radial-gradient(circle at 88% 13%, rgba(255, 209, 98, 0.14), transparent 18%),
+        linear-gradient(180deg, #eff3fb, #e7ecf6);
+      font-family: Inter, Arial, sans-serif;
+      color: var(--text);
+      padding: 18px;
+    }
+
+    .captcha {
+      width: min(100%, var(--card-w));
+      background: rgba(255,255,255,0.97);
+      border: 1px solid rgba(215,223,239,0.97);
+      box-shadow: 0 22px 68px rgba(34, 49, 82, 0.17);
+      padding: 16px;
+    }
+
+    @media (min-width: 821px) {
+      .captcha {
+        zoom: 0.9;
+      }
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      font-weight: 750;
+    }
+
+    .instructions {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .attempts {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #f6f8ff;
+      color: #42516f;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .stage {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #f2f5fb;
+    }
+
+    .startup-fallback {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #f2f5fb;
+      color: #42516f;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .startup-fallback strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #202738;
+      font-size: 18px;
+    }
+
+    .startup-fallback.hidden {
+      display: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .status {
+      flex: 1 1 320px;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fbfcff;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 10px 12px;
+    }
+
+    .status.bad {
+      background: var(--bad-bg);
+      color: var(--bad);
+      border-color: #f2c1c6;
+    }
+
+    .status.ok {
+      background: var(--ok-bg);
+      color: var(--ok);
+      border-color: #bee8d6;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .rotate-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .rotate-btn {
+      width: 46px;
+      height: 46px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      line-height: 1;
+      background: #edf2ff;
+      color: #334362;
+      border: 1px solid var(--border);
+      touch-action: none;
+    }
+
+    .rotate-btn:active {
+      transform: translateY(1px);
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .result-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(24, 33, 53, 0.42);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+    }
+
+    .result-modal.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .result-card {
+      width: min(100%, 410px);
+      overflow: hidden;
+      border: 1px solid rgba(212, 221, 238, 0.98);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.99);
+      box-shadow: 0 28px 90px rgba(23, 35, 62, 0.34);
+      transform: translateY(12px) scale(0.98);
+      transition: transform 0.2s ease;
+    }
+
+    .result-modal.visible .result-card {
+      transform: translateY(0) scale(1);
+    }
+
+    .result-topbar {
+      height: 8px;
+      background: linear-gradient(90deg, #3f72f7, #6b94ff);
+    }
+
+    .result-modal.failure .result-topbar {
+      background: linear-gradient(90deg, #c84f5a, #e67a83);
+    }
+
+    .result-body {
+      padding: 24px 24px 22px;
+    }
+
+    .result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .result-icon {
+      flex: 0 0 auto;
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #def6ec;
+      color: #167d59;
+      box-shadow: inset 0 0 0 1px rgba(22, 125, 89, 0.12);
+      font-size: 30px;
+      font-weight: 900;
+    }
+
+    .result-modal.failure .result-icon {
+      background: #ffe5e8;
+      color: #c84f5a;
+      box-shadow: inset 0 0 0 1px rgba(200, 79, 90, 0.12);
+    }
+
+    .result-copy h2 {
+      margin: 2px 0 7px;
+      color: #202738;
+      font-size: 22px;
+      line-height: 1.18;
+      font-weight: 820;
+    }
+
+    .result-copy p {
+      margin: 0;
+      color: #697389;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 520px) {
+      .result-body {
+        padding: 21px 18px 18px;
+      }
+
+      .result-row {
+        gap: 13px;
+      }
+
+      .result-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 27px;
+      }
+
+      .result-copy h2 {
+        font-size: 20px;
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <div class="captcha">
+    <div class="head">
+      <div>
+        <h1>Uzdevums</h1>
+        <p class="instructions">
+          Izvēlies pareizo priekšmetu un novieto to tā, lai gaismas avots aiz izvēlētā priekšmeta atstātu tādu pašu zilo ēnu, kāda šobrīd ir attēlā redzamā melnā ēna.
+          Lai ēnu atbilstoši pagrieztu, izmanto pelītes rullīti vai rotācijas pogas. Kad ēnas sakrīt, spied “Pārbaudīt”.
+        </p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="startup-fallback" id="startupFallback">
+        <div>
+          <strong>Interaktīvā pārbaude netika palaista.</strong>
+          Atver šo lapu pilnā pārlūkā vai kā publicētu tīmekļa lapu, nevis faila priekšskatījumā.
+        </div>
+      </div>
+      <canvas id="scene" width="688" height="688" aria-label="Ēnu puzle"></canvas>
+    </div>
+
+    <div class="bottom">
+      <div class="attempts" id="attemptsBadge">Mēģinājumi: 3</div>
+      <div class="status" id="statusBox">Izvēlies priekšmetu un ievelc to telpā</div>
+      <div class="buttons">
+        <div class="rotate-controls" aria-label="Objekta rotācija">
+          <button id="rotateLeftBtn" class="rotate-btn" type="button" aria-label="Pagriezt pa kreisi">↺</button>
+          <button id="rotateRightBtn" class="rotate-btn" type="button" aria-label="Pagriezt pa labi">↻</button>
+        </div>
+        <button id="submitBtn" class="primary">Pārbaudīt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-modal" id="resultModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <div class="result-card">
+      <div class="result-topbar"></div>
+      <div class="result-body">
+        <div class="result-row">
+          <div class="result-icon" id="resultIcon">✓</div>
+          <div class="result-copy">
+            <h2 id="resultTitle">Pārbaude veiksmīga</h2>
+            <p id="resultMessage">Tu esi cilvēks!</p>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+
+    const shadowMatchCanvasA = document.createElement('canvas');
+    const shadowMatchCanvasB = document.createElement('canvas');
+    shadowMatchCanvasA.width = canvas.width;
+    shadowMatchCanvasA.height = canvas.height;
+    shadowMatchCanvasB.width = canvas.width;
+    shadowMatchCanvasB.height = canvas.height;
+    const shadowMatchCtxA = shadowMatchCanvasA.getContext('2d', { willReadFrequently: true });
+    const shadowMatchCtxB = shadowMatchCanvasB.getContext('2d', { willReadFrequently: true });
+
+    const statusBox = document.getElementById('statusBox');
+    const attemptsBadge = document.getElementById('attemptsBadge');
+    const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+    const rotateRightBtn = document.getElementById('rotateRightBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultModal = document.getElementById('resultModal');
+    const resultIcon = document.getElementById('resultIcon');
+    const startupFallback = document.getElementById('startupFallback');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
+
+    if (startupFallback) {
+      startupFallback.classList.add('hidden');
+    }
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const ROOM_W = 4.0;
+    const ROOM_D = 4.0;
+    const ROOM_H = 4.8;
+
+    const ORIGIN = { x: 344, y: 400 };
+    const AX = { x: 104, y: 38 };
+    const AY = { x: -106, y: 10 };
+    const AZ = { x: 0, y: -78 };
+
+    const ROOM_DRAWING = {
+      cornerTop: { x: ORIGIN.x, y: ORIGIN.y + AZ.y * ROOM_H },
+      cornerFloor: { x: ORIGIN.x, y: ORIGIN.y },
+      leftFloor: { x: ORIGIN.x + AY.x * ROOM_D, y: ORIGIN.y + AY.y * ROOM_D },
+      rightFloor: { x: ORIGIN.x + AX.x * ROOM_W, y: ORIGIN.y + AX.y * ROOM_W }
+    };
+    // Main difficulty and tuning parameters.
+    const OBJECT_Z = 1.05;
+    const SHAPE_SCALE = 0.0250;
+    const ROT_STEP = 12;
+
+    // Extra clickable/dragable area around an objects visible outline, in screen pixels.
+    // Higher value = easier to grab objects especially on touch screens.
+    const OBJECT_DRAG_HIT_BUFFER_PX = 25;
+
+    // Higher value = stricter shadow matching. Lower value = more forgiving
+    const SHADOW_MATCH_MIN_IOU = 0.78;
+
+    const ATTEMPTS_PER_PUZZLE = 3;
+    const MAX_FAILED_PUZZLES = 1;
+
+    const TRAY_Y = H - 42;
+    const TRAY_SCALE = 1.23;
+    const TARGET_SHADOW_SAFE_BOTTOM = H - 72;
+
+    // 0.5 means side lights cannot appear below 50% of the canvas height
+    const SIDE_LIGHT_MAX_SCREEN_Y_RATIO = 0.5;
+
+    // Reject generated target shadows that are too small or too thin to read comfortably.
+    const TARGET_SHADOW_MIN_AREA = 11500;
+    const TARGET_SHADOW_MIN_WIDTH = 42;
+    const TARGET_SHADOW_MIN_HEIGHT = 42;
+
+    // Lower value = stricter. Higher value = allows more long shadows.
+    const TARGET_SHADOW_MAX_ELONGATION = 2.4;
+
+    // Folded multi surface shadows need an extra readability limit
+    const TARGET_SHADOW_MAX_SURFACE_ELONGATION = 2.4;
+
+    const TARGET_SHADOW_MAX_SURFACES = 2;
+
+    const TARGET_SHADOW_FILL = 'rgba(15, 20, 31, 0.66)';
+    const TARGET_SHADOW_STROKE = 'rgba(15, 20, 31, 0.14)';
+    const PREVIEW_SHADOW_FILL = 'rgba(79, 128, 255, 0.34)';
+    const PREVIEW_SHADOW_STROKE = 'rgba(79, 128, 255, 0.20)';
+
+    const SHADOW_INVALID_FRAME_GRACE = 2;
+    const SHADOW_RAW_RECOVERY_FRAMES = 4;
+
+    const ROTATE_HOLD_DELAY_MS = 300;
+    const ROTATE_REPEAT_MS = 105;
+
+    const SHAPES = [
+      {
+        id: 'key',
+        color: '#f0a836',
+        points: [[-28,-8],[-10,-8],[-10,-18],[8,-18],[8,-8],[22,-8],[22,8],[6,8],[6,18],[-8,18],[-8,8],[-28,8]]
+      },
+      {
+        id: 'arrow',
+        color: '#36b58f',
+        points: [[-30,0],[-6,-24],[-6,-11],[28,-11],[28,11],[-6,11],[-6,24]]
+      },
+      {
+        id: 'lshape',
+        color: '#b26ced',
+        points: [[-28,-28],[-4,-28],[-4,4],[24,4],[24,28],[-28,28]]
+      },
+      {
+        id: 'bottle',
+        color: '#ef6f88',
+        points: [[-9,-30],[9,-30],[9,-19],[18,-10],[18,25],[-18,25],[-18,-10],[-9,-19]]
+      },
+      {
+        id: 'flag',
+        color: '#5f82ff',
+        points: [[-26,-28],[-14,-28],[-14,-8],[20,-2],[-14,8],[-14,28],[-26,28]]
+      }
+    ].map(shape => ({ ...shape, normalized: normalizeShape(shape.points) }));
+
+    let objects = [];
+    let selectedObjectId = null;
+    let dragging = false;
+    let dragDX = 0;
+    let dragDY = 0;
+    let activeDragPointerId = null;
+    let dragStartClientX = 0;
+    let dragStartClientY = 0;
+    let pointerDragged = false;
+    let suppressCanvasClick = false;
+    let light = null;
+    let target = null;
+    let attemptsUsed = 0;
+    let failedPuzzles = 0;
+    let solved = false;
+    let gameEnded = false;
+    let rotateHoldTimeout = null;
+    let rotateRepeatInterval = null;
+    const shadowContinuity = new Map();
+
+    function normalizeShape(points) {
+      const maxY = Math.max(...points.map(point => point[1]));
+      return points.map(([x, y]) => ({ x, z: maxY - y }));
+    }
+
+    function rand(min, max) { return Math.random() * (max - min) + min; }
+    function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function choice(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+    function shuffle(list) {
+      const copy = [...list];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function modAngle(a) {
+      let n = a % 360;
+      if (n < 0) n += 360;
+      return n;
+    }
+
+    function project(point) {
+      return {
+        x: ORIGIN.x + AX.x * point.x + AY.x * point.y + AZ.x * point.z,
+        y: ORIGIN.y + AX.y * point.x + AY.y * point.y + AZ.y * point.z
+      };
+    }
+
+    function planeToScreen(x, y) {
+      return project({ x, y, z: OBJECT_Z });
+    }
+
+    function screenToPlane(sx, sy) {
+      const bx = sx - ORIGIN.x - AZ.x * OBJECT_Z;
+      const by = sy - ORIGIN.y - AZ.y * OBJECT_Z;
+      const det = AX.x * AY.y - AX.y * AY.x;
+      const x = (bx * AY.y - by * AY.x) / det;
+      const y = (AX.x * by - AX.y * bx) / det;
+      return { x, y };
+    }
+
+    function rotateHorizontal(x, angleDeg) {
+      const r = angleDeg * Math.PI / 180;
+      return { x: Math.cos(r) * x, y: Math.sin(r) * x };
+    }
+
+    function rotateScreen(x, y, angleDeg) {
+      const r = angleDeg * Math.PI / 180;
+      const c = Math.cos(r);
+      const s = Math.sin(r);
+      return { x: x * c - y * s, y: x * s + y * c };
+    }
+
+    function getShape(id) {
+      return SHAPES.find(shape => shape.id === id);
+    }
+
+    function getTrayScreenPolygon(obj) {
+      const shape = getShape(obj.shapeId);
+      return shape.points.map(([px, py]) => {
+        const rotated = rotateScreen(px * TRAY_SCALE, py * TRAY_SCALE, obj.rotation);
+        return {
+          x: obj.trayX + rotated.x,
+          y: obj.trayY + rotated.y
+        };
+      });
+    }
+
+    function getObjectScreenCenter(obj) {
+      return obj.staged
+        ? { x: obj.trayX, y: obj.trayY }
+        : planeToScreen(obj.x, obj.y);
+    }
+
+    function getObjectWorldPoints(obj, samplesPerEdge = 1) {
+      const shape = getShape(obj.shapeId).normalized;
+      const boundary = [];
+      for (let i = 0; i < shape.length; i++) {
+        const a = shape[i];
+        const b = shape[(i + 1) % shape.length];
+        for (let s = 0; s < samplesPerEdge; s++) {
+          const t = s / samplesPerEdge;
+          const lx = a.x + (b.x - a.x) * t;
+          const lz = a.z + (b.z - a.z) * t;
+          const horizontal = rotateHorizontal(lx * SHAPE_SCALE, obj.rotation);
+          boundary.push({
+            x: obj.x + horizontal.x,
+            y: obj.y + horizontal.y,
+            z: OBJECT_Z + (lz - 28) * SHAPE_SCALE
+          });
+        }
+      }
+      return boundary;
+    }
+
+    function getObjectScreenPolygon(obj) {
+      if (obj.staged) return getTrayScreenPolygon(obj);
+      return getObjectWorldPoints(obj, 1).map(project);
+    }
+
+    function polygonArea(points) {
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        area += a.x * b.y - b.x * a.y;
+      }
+      return Math.abs(area) * 0.5;
+    }
+
+    function polygonBounds(points) {
+      return points.reduce(
+        (box, point) => ({
+          minX: Math.min(box.minX, point.x),
+          maxX: Math.max(box.maxX, point.x),
+          minY: Math.min(box.minY, point.y),
+          maxY: Math.max(box.maxY, point.y)
+        }),
+        { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+      );
+    }
+
+    function polygonElongation(points) {
+      if (!points || points.length < 3) return Infinity;
+
+      const center = points.reduce(
+        (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }),
+        { x: 0, y: 0 }
+      );
+      center.x /= points.length;
+      center.y /= points.length;
+
+      let covXX = 0;
+      let covXY = 0;
+      let covYY = 0;
+
+      for (const point of points) {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        covXX += dx * dx;
+        covXY += dx * dy;
+        covYY += dy * dy;
+      }
+
+      covXX /= points.length;
+      covXY /= points.length;
+      covYY /= points.length;
+
+      const axisAngle = 0.5 * Math.atan2(2 * covXY, covXX - covYY);
+      const axisX = Math.cos(axisAngle);
+      const axisY = Math.sin(axisAngle);
+      const perpX = -axisY;
+      const perpY = axisX;
+
+      let minAlong = Infinity;
+      let maxAlong = -Infinity;
+      let minAcross = Infinity;
+      let maxAcross = -Infinity;
+
+      for (const point of points) {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        const along = dx * axisX + dy * axisY;
+        const across = dx * perpX + dy * perpY;
+
+        minAlong = Math.min(minAlong, along);
+        maxAlong = Math.max(maxAlong, along);
+        minAcross = Math.min(minAcross, across);
+        maxAcross = Math.max(maxAcross, across);
+      }
+
+      const alongSpan = maxAlong - minAlong;
+      const acrossSpan = maxAcross - minAcross;
+      const shorterSpan = Math.max(0.0001, Math.min(alongSpan, acrossSpan));
+      const longerSpan = Math.max(alongSpan, acrossSpan);
+
+      return longerSpan / shorterSpan;
+    }
+
+    function getShadowHitsForTargetReadability(obj) {
+      const boundary = getObjectWorldPoints(obj, 8);
+      const hits = [];
+
+      for (const worldPoint of boundary) {
+        const hit = shadowHit(worldPoint, false);
+        if (!hit) return null;
+        hits.push(hit);
+      }
+
+      return hits;
+    }
+
+    function unfoldShadowHitsForSurfaceCheck(hits) {
+      if (!hits || !hits.length) return null;
+
+      const planes = [...new Set(hits.map(hit => hit.plane))];
+      const hasFloor = planes.includes('floor');
+      const hasLeftWall = planes.includes('leftWall');
+      const hasRightWall = planes.includes('rightWall');
+
+      // One receiving surface: use that surface's own local coordinates.
+      if (planes.length === 1) {
+        if (hasFloor) {
+          return hits.map(hit => ({ x: hit.point.x, y: hit.point.y }));
+        }
+        if (hasLeftWall) {
+          return hits.map(hit => ({ x: hit.point.y, y: hit.point.z }));
+        }
+        if (hasRightWall) {
+          return hits.map(hit => ({ x: hit.point.x, y: hit.point.z }));
+        }
+      }
+
+      // Floor + right wall. Unfold the wall "down" across the shared floor line.
+      if (planes.length === 2 && hasFloor && hasRightWall) {
+        return hits.map(hit => hit.plane === 'floor'
+          ? { x: hit.point.x, y: hit.point.y }
+          : { x: hit.point.x, y: -hit.point.z }
+        );
+      }
+
+      // Floor + left wall. Unfold the wall "left" across the shared floor line.
+      if (planes.length === 2 && hasFloor && hasLeftWall) {
+        return hits.map(hit => hit.plane === 'floor'
+          ? { x: hit.point.x, y: hit.point.y }
+          : { x: -hit.point.z, y: hit.point.y }
+        );
+      }
+
+      // Two vertical walls. Unfold them around their shared vertical corner line.
+      if (planes.length === 2 && hasLeftWall && hasRightWall) {
+        return hits.map(hit => hit.plane === 'leftWall'
+          ? { x: -hit.point.y, y: hit.point.z }
+          : { x: hit.point.x, y: hit.point.z }
+        );
+      }
+
+      return null;
+    }
+
+    function foldedSurfaceElongationForTarget(obj) {
+      const hits = getShadowHitsForTargetReadability(obj);
+      if (!hits) return Infinity;
+
+      const surfaceCount = new Set(hits.map(hit => hit.plane)).size;
+      if (surfaceCount > TARGET_SHADOW_MAX_SURFACES) return Infinity;
+
+      const unfoldedPoints = unfoldShadowHitsForSurfaceCheck(hits);
+      if (!unfoldedPoints) return Infinity;
+
+      return polygonElongation(unfoldedPoints);
+    }
+
+    function pointInPolygon(point, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > point.y) !== (yj > point.y)) &&
+          (point.x < (xj - xi) * (point.y - yi) / ((yj - yi) || 0.00001) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pointToSegmentDistance(point, a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSq = dx * dx + dy * dy;
+
+      if (lengthSq <= 0.000001) {
+        return Math.hypot(point.x - a.x, point.y - a.y);
+      }
+
+      const t = Math.max(0, Math.min(1,
+        ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq
+      ));
+
+      const closestX = a.x + dx * t;
+      const closestY = a.y + dy * t;
+      return Math.hypot(point.x - closestX, point.y - closestY);
+    }
+
+    function pointNearPolygon(point, poly, bufferPx) {
+      if (pointInPolygon(point, poly)) return true;
+      if (!bufferPx || bufferPx <= 0) return false;
+
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i];
+        const b = poly[(i + 1) % poly.length];
+        if (pointToSegmentDistance(point, a, b) <= bufferPx) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    function getPointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function setStatus(text, kind = 'neutral') {
+      statusBox.textContent = text;
+      statusBox.className = 'status';
+      if (kind === 'bad') statusBox.classList.add('bad');
+      if (kind === 'ok') statusBox.classList.add('ok');
+    }
+
+    function updateRotationButtons() {
+      const hasSelectedMovableObject = !gameEnded &&
+        Boolean(selectedObjectId) &&
+        objects.some(obj => obj.id === selectedObjectId && !obj.staged);
+
+      rotateLeftBtn.disabled = !hasSelectedMovableObject;
+      rotateRightBtn.disabled = !hasSelectedMovableObject;
+    }
+
+    function rotateSelectedObject(direction) {
+      if (gameEnded || solved || !selectedObjectId) return false;
+
+      const obj = objects.find(item => item.id === selectedObjectId);
+      if (!obj || obj.staged) return false;
+
+      obj.rotation = modAngle(obj.rotation + direction * ROT_STEP);
+      render();
+      return true;
+    }
+
+    function stopRotationHold() {
+      if (rotateHoldTimeout) {
+        clearTimeout(rotateHoldTimeout);
+        rotateHoldTimeout = null;
+      }
+      if (rotateRepeatInterval) {
+        clearInterval(rotateRepeatInterval);
+        rotateRepeatInterval = null;
+      }
+    }
+
+    function startRotationHold(direction, event) {
+      if (event) {
+        event.preventDefault();
+        if (event.currentTarget && event.currentTarget.setPointerCapture && event.pointerId !== undefined) {
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch (error) {
+          }
+        }
+      }
+
+      stopRotationHold();
+
+      const rotated = rotateSelectedObject(direction);
+      if (!rotated) return;
+
+      rotateHoldTimeout = setTimeout(() => {
+        rotateRepeatInterval = setInterval(() => {
+          rotateSelectedObject(direction);
+        }, ROTATE_REPEAT_MS);
+      }, ROTATE_HOLD_DELAY_MS);
+    }
+
+    function updateAttempts() {
+      attemptsBadge.textContent = `Mēģinājumi: ${Math.max(0, ATTEMPTS_PER_PUZZLE - attemptsUsed)}`;
+    }
+
+    function drawPolygon(points, fill, stroke = null, lineWidth = 1) {
+      if (!points || points.length < 3) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (stroke) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    function drawRoom() {
+      ctx.clearRect(0, 0, W, H);
+
+      const cornerTop = ROOM_DRAWING.cornerTop;
+      const cornerFloor = ROOM_DRAWING.cornerFloor;
+      const leftFloor = ROOM_DRAWING.leftFloor;
+      const rightFloor = ROOM_DRAWING.rightFloor;
+
+      const leftWall = [
+        { x: -40, y: -40 },
+        { x: cornerTop.x, y: cornerTop.y },
+        { x: cornerFloor.x, y: cornerFloor.y },
+        { x: leftFloor.x, y: leftFloor.y },
+        { x: -40, y: H + 40 }
+      ];
+
+      const rightWall = [
+        { x: cornerTop.x, y: cornerTop.y },
+        { x: W + 40, y: -40 },
+        { x: W + 40, y: H + 40 },
+        { x: rightFloor.x, y: rightFloor.y },
+        { x: cornerFloor.x, y: cornerFloor.y }
+      ];
+
+      const floor = [
+        leftFloor,
+        cornerFloor,
+        rightFloor,
+        { x: W + 40, y: H + 40 },
+        { x: -40, y: H + 40 }
+      ];
+
+      const leftGrad = ctx.createLinearGradient(0, 0, cornerFloor.x, cornerFloor.y);
+      leftGrad.addColorStop(0, '#f5f7fb');
+      leftGrad.addColorStop(1, '#eef1f6');
+      drawPolygon(leftWall, leftGrad);
+
+      const rightGrad = ctx.createLinearGradient(cornerTop.x, 0, W, rightFloor.y);
+      rightGrad.addColorStop(0, '#eef2f7');
+      rightGrad.addColorStop(1, '#e6ebf3');
+      drawPolygon(rightWall, rightGrad);
+
+      const floorGrad = ctx.createLinearGradient(0, cornerFloor.y, 0, H);
+      floorGrad.addColorStop(0, '#e7ebf2');
+      floorGrad.addColorStop(1, '#dde4ee');
+      drawPolygon(floor, floorGrad);
+
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cornerTop.x, cornerTop.y);
+      ctx.lineTo(cornerFloor.x, cornerFloor.y);
+      ctx.lineTo(leftFloor.x, leftFloor.y);
+      ctx.moveTo(cornerFloor.x, cornerFloor.y);
+      ctx.lineTo(rightFloor.x, rightFloor.y);
+      ctx.stroke();
+    }
+
+    function drawBulb() {
+      const p = project(light.world);
+      const roomCenter = project({
+        x: ROOM_W * 0.5,
+        y: ROOM_D * 0.5,
+        z: ROOM_H * 0.5
+      });
+
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 42);
+      glow.addColorStop(0, 'rgba(255, 243, 169, 0.98)');
+      glow.addColorStop(0.42, 'rgba(255, 221, 110, 0.43)');
+      glow.addColorStop(1, 'rgba(255, 221, 110, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 42, 0, Math.PI * 2);
+      ctx.fill();
+
+      const baseAwayFromCenterAngle = Math.atan2(
+        p.y - roomCenter.y,
+        p.x - roomCenter.x
+      ) - Math.PI / 2;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(baseAwayFromCenterAngle);
+
+      ctx.fillStyle = '#ffd45d';
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#6d7892';
+      ctx.fillRect(-5, 6, 10, 8);
+      ctx.strokeStyle = '#6d7892';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-4, 15);
+      ctx.lineTo(4, 15);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function shadowHit(worldPoint, relaxed = false) {
+      const l = light.world;
+      const dir = {
+        x: worldPoint.x - l.x,
+        y: worldPoint.y - l.y,
+        z: worldPoint.z - l.z
+      };
+
+      const forwardHits = [];
+      const relaxedHits = [];
+
+      function addHit(plane, t, point) {
+        if (t > 1) {
+          forwardHits.push({ plane, t, point });
+        }
+        if (relaxed && t > 0.0001) {
+          relaxedHits.push({ plane, t, point });
+        }
+      }
+
+      // Receiver planes continue past the visible canvas so shadows move smoothly at edges.
+      if (Math.abs(dir.x) > 0.00001) {
+        const t = -l.x / dir.x;
+        addHit('leftWall', t, {
+          x: 0,
+          y: l.y + dir.y * t,
+          z: l.z + dir.z * t
+        });
+      }
+
+      if (Math.abs(dir.y) > 0.00001) {
+        const t = -l.y / dir.y;
+        addHit('rightWall', t, {
+          x: l.x + dir.x * t,
+          y: 0,
+          z: l.z + dir.z * t
+        });
+      }
+
+      if (Math.abs(dir.z) > 0.00001) {
+        const t = -l.z / dir.z;
+        addHit('floor', t, {
+          x: l.x + dir.x * t,
+          y: l.y + dir.y * t,
+          z: 0
+        });
+      }
+
+      if (forwardHits.length) {
+        forwardHits.sort((a, b) => a.t - b.t);
+        return forwardHits[0];
+      }
+
+      if (relaxed && relaxedHits.length) {
+        relaxedHits.sort((a, b) => a.t - b.t);
+        return relaxedHits[0];
+      }
+
+      return null;
+    }
+
+
+
+    function polygonHasSelfIntersection(points) {
+      if (!points || points.length < 4) return false;
+
+      function orientation(a, b, c) {
+        return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      }
+
+      function segmentsCross(a, b, c, d) {
+        const ab1 = orientation(a, b, c);
+        const ab2 = orientation(a, b, d);
+        const cd1 = orientation(c, d, a);
+        const cd2 = orientation(c, d, b);
+        return ab1 * ab2 < -0.000001 && cd1 * cd2 < -0.000001;
+      }
+
+      const n = points.length;
+      for (let i = 0; i < n; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % n];
+
+        for (let j = i + 1; j < n; j++) {
+          const nextI = (i + 1) % n;
+          const nextJ = (j + 1) % n;
+
+          // Adjacent edges share a vertex, so they do not count as a fold.
+          if (j === i || j === nextI || nextJ === i) continue;
+
+          const c = points[j];
+          const d = points[nextJ];
+          if (segmentsCross(a, b, c, d)) return true;
+        }
+      }
+
+      return false;
+    }
+
+    function shadowHitOnPlane(worldPoint, plane, relaxed = false) {
+      const l = light.world;
+      const dir = {
+        x: worldPoint.x - l.x,
+        y: worldPoint.y - l.y,
+        z: worldPoint.z - l.z
+      };
+
+      let t = null;
+      let point = null;
+
+      if (plane === 'leftWall' && Math.abs(dir.x) > 0.00001) {
+        t = -l.x / dir.x;
+        point = {
+          x: 0,
+          y: l.y + dir.y * t,
+          z: l.z + dir.z * t
+        };
+      }
+
+      if (plane === 'rightWall' && Math.abs(dir.y) > 0.00001) {
+        t = -l.y / dir.y;
+        point = {
+          x: l.x + dir.x * t,
+          y: 0,
+          z: l.z + dir.z * t
+        };
+      }
+
+      if (plane === 'floor' && Math.abs(dir.z) > 0.00001) {
+        t = -l.z / dir.z;
+        point = {
+          x: l.x + dir.x * t,
+          y: l.y + dir.y * t,
+          z: 0
+        };
+      }
+
+      if (t === null || !point) return null;
+      if (t > 1 || (relaxed && t > 0.0001)) return { plane, t, point };
+      return null;
+    }
+
+    function projectBoundaryToOnePlane(boundary, plane, relaxed = false) {
+      const points = [];
+      for (const worldPoint of boundary) {
+        const hit = shadowHitOnPlane(worldPoint, plane, relaxed);
+        if (!hit) return null;
+        points.push(project(hit.point));
+      }
+      return points;
+    }
+
+    function averageWorldPoint(points) {
+      const total = points.reduce(
+        (acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y, z: acc.z + point.z }),
+        { x: 0, y: 0, z: 0 }
+      );
+      return {
+        x: total.x / points.length,
+        y: total.y / points.length,
+        z: total.z / points.length
+      };
+    }
+
+    function fallbackPlaneOrder(boundary, hits, relaxed = false) {
+      const counts = { leftWall: 0, rightWall: 0, floor: 0 };
+      hits.forEach(hit => counts[hit.plane] += 1);
+
+      const ordered = Object.keys(counts)
+        .filter(plane => counts[plane] > 0)
+        .sort((a, b) => counts[b] - counts[a]);
+
+      const centerHit = shadowHit(averageWorldPoint(boundary), relaxed);
+      if (centerHit && ordered.includes(centerHit.plane)) {
+        ordered.splice(ordered.indexOf(centerHit.plane), 1);
+        ordered.unshift(centerHit.plane);
+      }
+
+      return ordered;
+    }
+
+    function cloneShadow(shadow) {
+      if (!shadow) return null;
+      return {
+        points: shadow.points.map(point => ({ x: point.x, y: point.y })),
+        planes: [...shadow.planes],
+        stabilized: Boolean(shadow.stabilized)
+      };
+    }
+
+    function getShadowContinuityState(obj) {
+      if (!obj || !obj.id) return null;
+      if (!shadowContinuity.has(obj.id)) {
+        shadowContinuity.set(obj.id, {
+          lastShadow: null,
+          invalidFrames: 0,
+          rawRecoveryFrames: 0,
+          mode: 'raw'
+        });
+      }
+      return shadowContinuity.get(obj.id);
+    }
+
+    function makeStableFallbackShadow(boundary, hits, relaxed = false) {
+      for (const plane of fallbackPlaneOrder(boundary, hits, relaxed)) {
+        const fallbackPoints = projectBoundaryToOnePlane(boundary, plane, relaxed);
+        if (!fallbackPoints) continue;
+        if (polygonHasSelfIntersection(fallbackPoints)) continue;
+        if (polygonArea(fallbackPoints) < 40) continue;
+
+        return {
+          points: fallbackPoints,
+          planes: [plane],
+          stabilized: true
+        };
+      }
+      return null;
+    }
+
+    function applyPreviewShadowContinuity(obj, rawShadow, fallbackShadow) {
+      const state = getShadowContinuityState(obj);
+      if (!state) return rawShadow || fallbackShadow;
+
+      if (rawShadow) {
+        state.invalidFrames = 0;
+
+        // Once the emergency projection has been used, wait for a few clean
+        // frames before returning to the true projection. Otherwise a borderline
+        // angle can switch back and forth quickly and look like a twitch.
+        if (state.mode === 'fallback') {
+          state.rawRecoveryFrames += 1;
+          if (state.rawRecoveryFrames < SHADOW_RAW_RECOVERY_FRAMES && fallbackShadow) {
+            state.lastShadow = cloneShadow(fallbackShadow);
+            return fallbackShadow;
+          }
+          state.mode = 'raw';
+          state.rawRecoveryFrames = 0;
+        }
+
+        state.lastShadow = cloneShadow(rawShadow);
+        return rawShadow;
+      }
+
+      state.rawRecoveryFrames = 0;
+      state.invalidFrames += 1;
+
+      // Hold the last clean preview briefly instead of snapping on a threshold flicker.
+      if (state.invalidFrames <= SHADOW_INVALID_FRAME_GRACE && state.lastShadow) {
+        return cloneShadow(state.lastShadow);
+      }
+
+      if (fallbackShadow) {
+        state.mode = 'fallback';
+        state.lastShadow = cloneShadow(fallbackShadow);
+        return fallbackShadow;
+      }
+
+      return state.lastShadow ? cloneShadow(state.lastShadow) : null;
+    }
+
+    function getShadowPolygon(obj, relaxed = false) {
+      if (!obj || obj.staged) return null;
+
+      const boundary = getObjectWorldPoints(obj, 8);
+      const rawShadowPoints = [];
+      const hits = [];
+      const planes = new Set();
+
+      for (const worldPoint of boundary) {
+        const hit = shadowHit(worldPoint, relaxed);
+        if (!hit) return null;
+        hits.push(hit);
+        rawShadowPoints.push(project(hit.point));
+        planes.add(hit.plane);
+      }
+
+      const rawShadowUsable = rawShadowPoints.length >= 3 &&
+        polygonArea(rawShadowPoints) >= 40 &&
+        !polygonHasSelfIntersection(rawShadowPoints);
+
+      const rawShadow = rawShadowUsable
+        ? {
+            points: rawShadowPoints,
+            planes: [...planes],
+            stabilized: false
+          }
+        : null;
+
+      const continuityState = relaxed && obj.id
+        ? getShadowContinuityState(obj)
+        : null;
+
+      // Keep fallback mode stable for a few frames to avoid rapid visual toggling.
+      const needsFallback = !rawShadow || continuityState && continuityState.mode === 'fallback';
+      const fallbackShadow = needsFallback
+        ? makeStableFallbackShadow(boundary, hits, relaxed)
+        : null;
+
+      if (relaxed && obj.id) {
+        return applyPreviewShadowContinuity(obj, rawShadow, fallbackShadow);
+      }
+
+      return rawShadow || fallbackShadow;
+    }
+
+    function drawShadow(shadow, fill, stroke) {
+      if (!shadow) return;
+      drawPolygon(shadow.points, fill, stroke, 1);
+    }
+
+    function drawShadowMask(maskCtx, shadow) {
+      maskCtx.clearRect(0, 0, W, H);
+      if (!shadow || !shadow.points || shadow.points.length < 3) return;
+
+      maskCtx.beginPath();
+      maskCtx.moveTo(shadow.points[0].x, shadow.points[0].y);
+      for (let i = 1; i < shadow.points.length; i++) {
+        maskCtx.lineTo(shadow.points[i].x, shadow.points[i].y);
+      }
+      maskCtx.closePath();
+      maskCtx.fillStyle = '#000';
+      maskCtx.fill();
+    }
+
+    // 1.0 means perfect silhouette overlap, 0.0 means no overlap.
+    function shadowOverlapIoU(shadowA, shadowB) {
+      if (!shadowA || !shadowB) return 0;
+
+      drawShadowMask(shadowMatchCtxA, shadowA);
+      drawShadowMask(shadowMatchCtxB, shadowB);
+
+      const dataA = shadowMatchCtxA.getImageData(0, 0, W, H).data;
+      const dataB = shadowMatchCtxB.getImageData(0, 0, W, H).data;
+
+      let intersection = 0;
+      let union = 0;
+
+      for (let i = 3; i < dataA.length; i += 4) {
+        const inA = dataA[i] > 10;
+        const inB = dataB[i] > 10;
+
+        if (inA || inB) union += 1;
+        if (inA && inB) intersection += 1;
+      }
+
+      return union > 0 ? intersection / union : 0;
+    }
+
+    function drawObject(obj) {
+      const poly = getObjectScreenPolygon(obj);
+      const center = getObjectScreenCenter(obj);
+      const shape = getShape(obj.shapeId);
+
+      if (selectedObjectId === obj.id) {
+        const glow = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, 48);
+        glow.addColorStop(0, 'rgba(63, 114, 247, 0.18)');
+        glow.addColorStop(1, 'rgba(63, 114, 247, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(center.x, center.y, 48, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      drawPolygon(poly, shape.color, selectedObjectId === obj.id ? '#2549a7' : 'rgba(31, 44, 68, 0.22)', selectedObjectId === obj.id ? 2.4 : 1.5);
+    }
+
+    function render() {
+      drawRoom();
+
+      if (target && target.shadow) {
+        drawShadow(target.shadow, TARGET_SHADOW_FILL, TARGET_SHADOW_STROKE);
+      }
+
+      const selected = objects.find(obj => obj.id === selectedObjectId);
+      if (selected && !selected.staged) {
+        drawShadow(getShadowPolygon(selected, true), PREVIEW_SHADOW_FILL, PREVIEW_SHADOW_STROKE);
+      }
+
+      drawBulb();
+      [...objects].sort((a, b) => a.zIndex - b.zIndex).forEach(drawObject);
+      updateRotationButtons();
+    }
+
+    function objectAt(point) {
+      const ordered = [...objects].sort((a, b) => b.zIndex - a.zIndex);
+      for (const obj of ordered) {
+        const polygon = getObjectScreenPolygon(obj);
+        if (pointNearPolygon(point, polygon, OBJECT_DRAG_HIT_BUFFER_PX)) return obj;
+      }
+      return null;
+    }
+
+    function bringToFront(obj) {
+      const max = Math.max(...objects.map(item => item.zIndex), 0);
+      obj.zIndex = max + 1;
+    }
+
+    function makeObjects() {
+      const slots = shuffle([
+        { x: 88, y: TRAY_Y },
+        { x: 216, y: TRAY_Y + rand(-2, 2) },
+        { x: 344, y: TRAY_Y + rand(-2, 2) },
+        { x: 472, y: TRAY_Y + rand(-2, 2) },
+        { x: 600, y: TRAY_Y + rand(-2, 2) }
+      ]);
+
+      return shuffle(SHAPES).map((shape, index) => ({
+        id: `obj-${shape.id}`,
+        shapeId: shape.id,
+        staged: true,
+        trayX: slots[index].x,
+        trayY: slots[index].y,
+        x: null,
+        y: null,
+        rotation: randInt(0, 29) * ROT_STEP,
+        zIndex: index + 1
+      }));
+    }
+
+    function solveTopLight() {
+      for (let attempt = 0; attempt < 240; attempt++) {
+        const x = rand(0.55, 3.45);
+        const y = rand(0.45, 3.45);
+        const screenY = rand(2, 14);
+        const z = (screenY - ORIGIN.y - AX.y * x - AY.y * y) / AZ.y;
+        const world = { x, y, z };
+        const p = project(world);
+        if (z > ROOM_H + 0.4 && p.x > 38 && p.x < W - 38 && p.y >= -2 && p.y <= 18) {
+          return { side: 'top', world };
+        }
+      }
+      return null;
+    }
+
+    function solveLeftLight() {
+      const maxSideLightScreenY = H * SIDE_LIGHT_MAX_SCREEN_Y_RATIO;
+
+      for (let attempt = 0; attempt < 260; attempt++) {
+        const x = rand(0.35, 2.25);
+        const screenX = rand(2, 14);
+        const y = (screenX - ORIGIN.x - AX.x * x) / AY.x;
+        const screenY = rand(42, maxSideLightScreenY);
+        const z = (screenY - ORIGIN.y - AX.y * x - AY.y * y) / AZ.y;
+        const world = { x, y, z };
+        const p = project(world);
+        if (y > ROOM_D + 0.2 && z > 0.7 && z < ROOM_H + 0.2 && p.x >= -2 && p.x <= 18 && p.y > 30 && p.y <= maxSideLightScreenY) {
+          return { side: 'left', world };
+        }
+      }
+      return null;
+    }
+
+    function solveRightLight() {
+      const maxSideLightScreenY = H * SIDE_LIGHT_MAX_SCREEN_Y_RATIO;
+
+      for (let attempt = 0; attempt < 260; attempt++) {
+        const y = rand(0.35, 2.25);
+        const screenX = rand(W - 14, W - 2);
+        const x = (screenX - ORIGIN.x - AY.x * y) / AX.x;
+        const screenY = rand(42, maxSideLightScreenY);
+        const z = (screenY - ORIGIN.y - AX.y * x - AY.y * y) / AZ.y;
+        const world = { x, y, z };
+        const p = project(world);
+        if (x > ROOM_W + 0.2 && z > 0.7 && z < ROOM_H + 0.2 && p.x >= W - 18 && p.x <= W + 2 && p.y > 30 && p.y <= maxSideLightScreenY) {
+          return { side: 'right', world };
+        }
+      }
+      return null;
+    }
+
+    function createLight() {
+      const makers = shuffle([solveTopLight, solveLeftLight, solveRightLight]);
+      for (const maker of makers) {
+        const candidate = maker();
+        if (candidate) return candidate;
+      }
+      return { side: 'top', world: { x: 2.0, y: 2.4, z: 4.7 } };
+    }
+
+    function shadowDirectionOK(shadow, side) {
+      const planes = shadow.planes;
+      if (side === 'left') return planes.includes('rightWall') || planes.includes('floor');
+      if (side === 'right') return planes.includes('leftWall') || planes.includes('floor');
+      return planes.length >= 1;
+    }
+
+    function createTarget(shapeId) {
+      for (let attempt = 0; attempt < 180; attempt++) {
+        const candidate = {
+          shapeId,
+          x: rand(0.45, 3.55),
+          y: rand(0.45, 3.2),
+          rotation: randInt(0, 29) * ROT_STEP
+        };
+
+        const shadow = getShadowPolygon(candidate, false);
+        if (!shadow) continue;
+        if (!shadowDirectionOK(shadow, light.side)) continue;
+
+        const area = polygonArea(shadow.points);
+        if (area < TARGET_SHADOW_MIN_AREA) continue;
+
+        const shadowBounds = polygonBounds(shadow.points);
+        const shadowWidth = shadowBounds.maxX - shadowBounds.minX;
+        const shadowHeight = shadowBounds.maxY - shadowBounds.minY;
+        if (shadowWidth < TARGET_SHADOW_MIN_WIDTH || shadowHeight < TARGET_SHADOW_MIN_HEIGHT) continue;
+
+        const shadowElongation = polygonElongation(shadow.points);
+        if (shadowElongation > TARGET_SHADOW_MAX_ELONGATION) continue;
+
+        if (shadow.planes.length > TARGET_SHADOW_MAX_SURFACES) continue;
+
+        if (shadow.planes.length > 1) {
+          const foldedSurfaceElongation = foldedSurfaceElongationForTarget(candidate);
+          if (foldedSurfaceElongation > TARGET_SHADOW_MAX_SURFACE_ELONGATION) continue;
+        }
+
+        const visible = shadow.points.every(
+          p => p.x > -18 && p.x < W + 18 && p.y > -18 && p.y < TARGET_SHADOW_SAFE_BOTTOM
+        );
+        if (!visible) continue;
+
+        return { ...candidate, shadow };
+      }
+      return null;
+    }
+
+    function resetPuzzle(message = 'Izvēlies priekšmetu un ievelc to telpā') {
+      attemptsUsed = 0;
+      solved = false;
+      selectedObjectId = null;
+      stopRotationHold();
+      shadowContinuity.clear();
+      dragging = false;
+      activeDragPointerId = null;
+      pointerDragged = false;
+      suppressCanvasClick = false;
+      canvas.classList.remove('dragging');
+      submitBtn.disabled = gameEnded;
+      submitBtn.hidden = false;
+
+      let ready = false;
+      for (let attempt = 0; attempt < 40 && !ready; attempt++) {
+        light = createLight();
+        objects = makeObjects();
+        const chosen = choice(objects);
+        target = createTarget(chosen.shapeId);
+        if (target && target.shadow) ready = true;
+      }
+
+      if (!ready) {
+        light = { side: 'top', world: { x: 2.0, y: 2.4, z: 4.7 } };
+        objects = makeObjects();
+        const fallback = {
+          shapeId: objects[0].shapeId,
+          x: 2.0,
+          y: 1.65,
+          rotation: 0
+        };
+        const fallbackShadow = getShadowPolygon(fallback, false);
+        target = fallbackShadow
+          ? { ...fallback, shadow: fallbackShadow }
+          : createTarget(objects[0].shapeId);
+      }
+
+      updateAttempts();
+      setStatus(message, 'neutral');
+      render();
+    }
+
+    function showResultModal(isHuman) {
+      resultModal.classList.toggle('failure', !isHuman);
+      resultModal.classList.add('visible');
+      resultModal.setAttribute('aria-hidden', 'false');
+
+      if (isHuman) {
+        resultIcon.textContent = '✓';
+        resultTitle.textContent = 'Pārbaude veiksmīga';
+        resultMessage.textContent = 'Tu esi cilvēks!';
+      } else {
+        resultIcon.textContent = '×';
+        resultTitle.textContent = 'Pārbaude neizdevās';
+        resultMessage.textContent = 'Tu neesi cilvēks!';
+      }
+    }
+
+    function endGame(isHuman) {
+      gameEnded = true;
+      solved = isHuman;
+      dragging = false;
+      activeDragPointerId = null;
+      pointerDragged = false;
+      suppressCanvasClick = false;
+      stopRotationHold();
+      selectedObjectId = null;
+      canvas.classList.remove('dragging');
+      submitBtn.disabled = true;
+
+      if (isHuman) {
+        setStatus('Tu esi cilvēks!', 'ok');
+      } else {
+        setStatus('Tu neesi cilvēks!', 'bad');
+      }
+
+      showResultModal(isHuman);
+      render();
+    }
+
+    function failAttempt() {
+      if (gameEnded) return;
+
+      attemptsUsed += 1;
+      updateAttempts();
+      const remaining = ATTEMPTS_PER_PUZZLE - attemptsUsed;
+
+      if (remaining > 0) {
+        setStatus(`Nepareizi. Atlicis mēģinājums: ${remaining}.`, 'bad');
+        return;
+      }
+
+      failedPuzzles += 1;
+
+      if (failedPuzzles < MAX_FAILED_PUZZLES) {
+        resetPuzzle('Šai situācijai mēģinājumi beigušies. Izveidota jauna puzle.');
+        return;
+      }
+
+      endGame(false);
+    }
+
+    function checkSolution() {
+      if (gameEnded || solved || !target) return;
+      const obj = objects.find(item => item.shapeId === target.shapeId);
+      if (!obj || obj.staged) {
+        failAttempt();
+        render();
+        return;
+      }
+
+      const candidateShadow = getShadowPolygon(obj, false);
+      const targetShadow = target.shadow;
+      const shadowMatch = shadowOverlapIoU(candidateShadow, targetShadow);
+
+      if (shadowMatch >= SHADOW_MATCH_MIN_IOU) {
+        endGame(true);
+      } else {
+        failAttempt();
+        if (!gameEnded) render();
+      }
+    }
+
+    function beginCanvasDrag(clientX, clientY, pointerId, event) {
+      if (gameEnded || solved) return false;
+
+      const pointer = getPointerPosition({ clientX, clientY });
+      const hit = objectAt(pointer);
+      if (!hit) return false;
+
+      if (event) event.preventDefault();
+
+      activeDragPointerId = pointerId;
+      dragStartClientX = clientX;
+      dragStartClientY = clientY;
+      pointerDragged = false;
+      suppressCanvasClick = false;
+
+      selectedObjectId = hit.id;
+      bringToFront(hit);
+
+      if (hit.staged) {
+        const startPlane = screenToPlane(hit.trayX, hit.trayY);
+        hit.staged = false;
+        hit.x = startPlane.x;
+        hit.y = startPlane.y;
+      }
+
+      const plane = screenToPlane(pointer.x, pointer.y);
+      dragDX = hit.x - plane.x;
+      dragDY = hit.y - plane.y;
+      dragging = true;
+      canvas.classList.add('dragging');
+      render();
+      return true;
+    }
+
+    function moveCanvasDrag(clientX, clientY, pointerId, event) {
+      if (!dragging || pointerId !== activeDragPointerId) return;
+      if (event) event.preventDefault();
+
+      const travel = Math.hypot(
+        clientX - dragStartClientX,
+        clientY - dragStartClientY
+      );
+      if (travel > 3) pointerDragged = true;
+
+      const obj = objects.find(item => item.id === selectedObjectId);
+      if (!obj) return;
+
+      const pointer = getPointerPosition({ clientX, clientY });
+      const plane = screenToPlane(pointer.x, pointer.y);
+      obj.x = plane.x + dragDX;
+      obj.y = plane.y + dragDY;
+      render();
+    }
+
+    function finishCanvasDrag(pointerId) {
+      if (!dragging) return;
+      if (pointerId !== undefined && pointerId !== activeDragPointerId) return;
+
+      if (pointerDragged) suppressCanvasClick = true;
+
+      dragging = false;
+      activeDragPointerId = null;
+      canvas.classList.remove('dragging');
+    }
+
+    canvas.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+      const started = beginCanvasDrag(event.clientX, event.clientY, event.pointerId, event);
+      if (!started) return;
+
+      if (canvas.setPointerCapture) {
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch (error) {
+        }
+      }
+    });
+
+    window.addEventListener('pointermove', event => {
+      moveCanvasDrag(event.clientX, event.clientY, event.pointerId, event);
+    }, { passive: false });
+
+    function endObjectDrag(event) {
+      finishCanvasDrag(event.pointerId);
+
+      if (canvas.releasePointerCapture) {
+        try {
+          canvas.releasePointerCapture(event.pointerId);
+        } catch (error) {
+        }
+      }
+    }
+
+    window.addEventListener('pointerup', endObjectDrag);
+    window.addEventListener('pointercancel', endObjectDrag);
+
+    if (!window.PointerEvent) {
+      canvas.addEventListener('mousedown', event => {
+        if (event.button !== 0) return;
+        beginCanvasDrag(event.clientX, event.clientY, 'mouse', event);
+      });
+
+      window.addEventListener('mousemove', event => {
+        moveCanvasDrag(event.clientX, event.clientY, 'mouse', event);
+      });
+
+      window.addEventListener('mouseup', () => {
+        finishCanvasDrag('mouse');
+      });
+
+      canvas.addEventListener('touchstart', event => {
+        if (!event.touches || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        beginCanvasDrag(touch.clientX, touch.clientY, touch.identifier, event);
+      }, { passive: false });
+
+      window.addEventListener('touchmove', event => {
+        if (!event.touches || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        moveCanvasDrag(touch.clientX, touch.clientY, touch.identifier, event);
+      }, { passive: false });
+
+      window.addEventListener('touchend', event => {
+        const changed = event.changedTouches && event.changedTouches[0];
+        if (!changed) return;
+        finishCanvasDrag(changed.identifier);
+      });
+
+      window.addEventListener('touchcancel', event => {
+        const changed = event.changedTouches && event.changedTouches[0];
+        if (!changed) return;
+        finishCanvasDrag(changed.identifier);
+      });
+    }
+
+    canvas.addEventListener('click', event => {
+      if (gameEnded || dragging) return;
+
+      if (suppressCanvasClick) {
+        suppressCanvasClick = false;
+        return;
+      }
+
+      const pointer = getPointerPosition(event);
+      const hit = objectAt(pointer);
+      if (hit) {
+        selectedObjectId = hit.id;
+        bringToFront(hit);
+      } else {
+        selectedObjectId = null;
+      }
+      render();
+    });
+
+    canvas.addEventListener('wheel', event => {
+      if (gameEnded || solved || !selectedObjectId) return;
+      event.preventDefault();
+      rotateSelectedObject(event.deltaY > 0 ? 1 : -1);
+    }, { passive: false });
+
+    rotateLeftBtn.addEventListener('pointerdown', event => startRotationHold(-1, event));
+    rotateRightBtn.addEventListener('pointerdown', event => startRotationHold(1, event));
+
+    [rotateLeftBtn, rotateRightBtn].forEach(button => {
+      button.addEventListener('pointerup', stopRotationHold);
+      button.addEventListener('pointercancel', stopRotationHold);
+      button.addEventListener('pointerleave', stopRotationHold);
+      button.addEventListener('contextmenu', event => event.preventDefault());
+    });
+
+    window.addEventListener('pointerup', stopRotationHold);
+
+    if (!window.PointerEvent) {
+      rotateLeftBtn.addEventListener('mousedown', event => startRotationHold(-1, event));
+      rotateRightBtn.addEventListener('mousedown', event => startRotationHold(1, event));
+
+      [rotateLeftBtn, rotateRightBtn].forEach(button => {
+        button.addEventListener('mouseup', stopRotationHold);
+        button.addEventListener('mouseleave', stopRotationHold);
+        button.addEventListener('touchend', stopRotationHold);
+        button.addEventListener('touchcancel', stopRotationHold);
+      });
+
+      rotateLeftBtn.addEventListener('touchstart', event => startRotationHold(-1, event), { passive: false });
+      rotateRightBtn.addEventListener('touchstart', event => startRotationHold(1, event), { passive: false });
+      window.addEventListener('mouseup', stopRotationHold);
+      window.addEventListener('touchend', stopRotationHold);
+      window.addEventListener('touchcancel', stopRotationHold);
+    }
+
+    window.addEventListener('blur', stopRotationHold);
+
+    submitBtn.addEventListener('click', checkSolution);
+    resetPuzzle();
+  </script>
+</body>
+</html>
