@@ -451,9 +451,9 @@
     const SIDE_LIGHT_MAX_SCREEN_Y_RATIO = 0.5;
 
     // Reject generated target shadows that are too small or too thin to read comfortably.
-    const TARGET_SHADOW_MIN_AREA = 11500;
-    const TARGET_SHADOW_MIN_WIDTH = 42;
-    const TARGET_SHADOW_MIN_HEIGHT = 42;
+    const TARGET_SHADOW_MIN_AREA = 10000;
+    const TARGET_SHADOW_MIN_WIDTH = 30;
+    const TARGET_SHADOW_MIN_HEIGHT = 30;
 
     // Lower value = stricter. Higher value = allows more long shadows.
     const TARGET_SHADOW_MAX_ELONGATION = 2.4;
@@ -475,18 +475,18 @@
     const ROTATE_REPEAT_MS = 105;
 
     const AMBIENT_ANIMATION_FRAME_MS = 1000 / 30;
-    const DECOR_PATTERN_BASE_SCALE = 0.0082;
+    const DECOR_PATTERN_BASE_SCALE = 0.015;
     const DECOR_PATTERN_JITTER = 0.0022;
-    const DECOR_PATTERN_COUNTS = { leftWall: 28, rightWall: 28, floor: 42 };
+    const DECOR_PATTERN_COUNTS = { leftWall: 12, rightWall: 12, floor: 8 };
     const DECOR_PATTERN_STYLE = {
       leftWall: { r: 95, g: 115, b: 151, alpha: 0.088 },
       rightWall: { r: 88, g: 108, b: 146, alpha: 0.081 },
       floor: { r: 88, g: 104, b: 136, alpha: 0.076 }
     };
     const DECOR_SURFACE_MARGINS = {
-      leftWall: { uMin: 0.05, uMax: 0.95, vMin: 0.09, vMax: 0.91 },
-      rightWall: { uMin: 0.05, uMax: 0.95, vMin: 0.09, vMax: 0.91 },
-      floor: { uMin: 0.03, uMax: 0.97, vMin: 0.03, vMax: 0.90 }
+      leftWall: { uMin: 0.01, uMax: 0.99, vMin: 0.01, vMax: 0.99 },
+      rightWall: { uMin: 0.01, uMax: 0.99, vMin: 0.01, vMax: 0.99 },
+      floor: { uMin: 0.01, uMax: 0.99, vMin: 0.01, vMax: 0.99 }
     };
     const DYNAMIC_NOISE_BANDS = 9;
     const TARGET_MULTI_SURFACE_PREFERRED_RATIO = 0.72;
@@ -1050,7 +1050,7 @@
           speed: rand(0.35, 0.78),
           phase: rand(0, Math.PI * 2),
           tint: choice(['cool', 'pink', 'yellow']),
-          alpha: rand(0.075, 0.145)
+          alpha: rand(0.1, 0.4)
         });
       }
 
