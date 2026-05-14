@@ -475,20 +475,20 @@
     const ROTATE_REPEAT_MS = 105;
 
     const AMBIENT_ANIMATION_FRAME_MS = 1000 / 30;
-    const DECOR_PATTERN_BASE_SCALE = 0.0056;
-    const DECOR_PATTERN_JITTER = 0.0017;
-    const DECOR_PATTERN_COUNTS = { leftWall: 17, rightWall: 17, floor: 26 };
+    const DECOR_PATTERN_BASE_SCALE = 0.0082;
+    const DECOR_PATTERN_JITTER = 0.0022;
+    const DECOR_PATTERN_COUNTS = { leftWall: 28, rightWall: 28, floor: 42 };
     const DECOR_PATTERN_STYLE = {
-      leftWall: { r: 95, g: 115, b: 151, alpha: 0.075 },
-      rightWall: { r: 88, g: 108, b: 146, alpha: 0.068 },
-      floor: { r: 88, g: 104, b: 136, alpha: 0.062 }
+      leftWall: { r: 95, g: 115, b: 151, alpha: 0.088 },
+      rightWall: { r: 88, g: 108, b: 146, alpha: 0.081 },
+      floor: { r: 88, g: 104, b: 136, alpha: 0.076 }
     };
     const DECOR_SURFACE_MARGINS = {
-      leftWall: { uMin: 0.12, uMax: 0.88, vMin: 0.18, vMax: 0.84 },
-      rightWall: { uMin: 0.12, uMax: 0.88, vMin: 0.18, vMax: 0.84 },
-      floor: { uMin: 0.10, uMax: 0.90, vMin: 0.10, vMax: 0.82 }
+      leftWall: { uMin: 0.05, uMax: 0.95, vMin: 0.09, vMax: 0.91 },
+      rightWall: { uMin: 0.05, uMax: 0.95, vMin: 0.09, vMax: 0.91 },
+      floor: { uMin: 0.03, uMax: 0.97, vMin: 0.03, vMax: 0.90 }
     };
-    const DYNAMIC_NOISE_BANDS = 5;
+    const DYNAMIC_NOISE_BANDS = 9;
     const TARGET_MULTI_SURFACE_PREFERRED_RATIO = 0.72;
     const TARGET_MULTI_SURFACE_ATTEMPTS = 240;
 
@@ -1034,7 +1034,7 @@
             v: rand(margin.vMin, margin.vMax),
             rotation: rand(0, 360),
             scale: DECOR_PATTERN_BASE_SCALE + rand(-DECOR_PATTERN_JITTER, DECOR_PATTERN_JITTER) * (surface === 'floor' ? 1.1 : 1),
-            alphaScale: rand(0.8, 1.22)
+            alphaScale: rand(0.95, 1.32)
           });
         }
       });
@@ -1049,8 +1049,8 @@
           secondaryTravel: rand(-0.08, 0.08),
           speed: rand(0.35, 0.78),
           phase: rand(0, Math.PI * 2),
-          tint: Math.random() < 0.55 ? 'cool' : 'warm',
-          alpha: rand(0.055, 0.11)
+          tint: choice(['cool', 'pink', 'yellow']),
+          alpha: rand(0.075, 0.145)
         });
       }
 
@@ -1124,10 +1124,14 @@
           gradient.addColorStop(0, 'rgba(153, 185, 255, 0)');
           gradient.addColorStop(0.5, 'rgba(153, 185, 255, ' + band.alpha.toFixed(3) + ')');
           gradient.addColorStop(1, 'rgba(153, 185, 255, 0)');
+        } else if (band.tint === 'pink') {
+          gradient.addColorStop(0, 'rgba(255, 170, 222, 0)');
+          gradient.addColorStop(0.5, 'rgba(255, 170, 222, ' + (band.alpha * 0.98).toFixed(3) + ')');
+          gradient.addColorStop(1, 'rgba(255, 170, 222, 0)');
         } else {
-          gradient.addColorStop(0, 'rgba(255, 244, 205, 0)');
-          gradient.addColorStop(0.5, 'rgba(255, 244, 205, ' + (band.alpha * 0.92).toFixed(3) + ')');
-          gradient.addColorStop(1, 'rgba(255, 244, 205, 0)');
+          gradient.addColorStop(0, 'rgba(255, 237, 130, 0)');
+          gradient.addColorStop(0.5, 'rgba(255, 237, 130, ' + (band.alpha * 0.96).toFixed(3) + ')');
+          gradient.addColorStop(1, 'rgba(255, 237, 130, 0)');
         }
 
         drawPolygon(poly, gradient);
