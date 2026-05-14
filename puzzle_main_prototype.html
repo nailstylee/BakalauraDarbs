@@ -474,6 +474,24 @@
     const ROTATE_HOLD_DELAY_MS = 300;
     const ROTATE_REPEAT_MS = 105;
 
+    const AMBIENT_ANIMATION_FRAME_MS = 1000 / 30;
+    const DECOR_PATTERN_BASE_SCALE = 0.0056;
+    const DECOR_PATTERN_JITTER = 0.0017;
+    const DECOR_PATTERN_COUNTS = { leftWall: 17, rightWall: 17, floor: 26 };
+    const DECOR_PATTERN_STYLE = {
+      leftWall: { r: 95, g: 115, b: 151, alpha: 0.075 },
+      rightWall: { r: 88, g: 108, b: 146, alpha: 0.068 },
+      floor: { r: 88, g: 104, b: 136, alpha: 0.062 }
+    };
+    const DECOR_SURFACE_MARGINS = {
+      leftWall: { uMin: 0.12, uMax: 0.88, vMin: 0.18, vMax: 0.84 },
+      rightWall: { uMin: 0.12, uMax: 0.88, vMin: 0.18, vMax: 0.84 },
+      floor: { uMin: 0.10, uMax: 0.90, vMin: 0.10, vMax: 0.82 }
+    };
+    const DYNAMIC_NOISE_BANDS = 5;
+    const TARGET_MULTI_SURFACE_PREFERRED_RATIO = 0.72;
+    const TARGET_MULTI_SURFACE_ATTEMPTS = 240;
+
     const SHAPES = [
       {
         id: 'key',
@@ -520,6 +538,9 @@
     let gameEnded = false;
     let rotateHoldTimeout = null;
     let rotateRepeatInterval = null;
+    let roomDecor = null;
+    let ambientAnimationTime = 0;
+    let lastAmbientFrameTime = 0;
     const shadowContinuity = new Map();
 
     function normalizeShape(points) {
@@ -911,6 +932,241 @@
       }
     }
 
+    function getRoomSurfacePolygons() {
+      const cornerTop = ROOM_DRAWING.cornerTop;
+      const cornerFloor = ROOM_DRAWING.cornerFloor;
+      const leftFloor = ROOM_DRAWING.leftFloor;
+      const rightFloor = ROOM_DRAWING.rightFloor;
+
+      return {
+        leftWall: [
+          { x: -40, y: -40 },
+          { x: cornerTop.x, y: cornerTop.y },
+          { x: cornerFloor.x, y: cornerFloor.y },
+          { x: leftFloor.x, y: leftFloor.y },
+          { x: -40, y: H + 40 }
+        ],
+        rightWall: [
+          { x: cornerTop.x, y: cornerTop.y },
+          { x: W + 40, y: -40 },
+          { x: W + 40, y: H + 40 },
+          { x: rightFloor.x, y: rightFloor.y },
+          { x: cornerFloor.x, y: cornerFloor.y }
+        ],
+        floor: [
+          leftFloor,
+          cornerFloor,
+          rightFloor,
+          { x: W + 40, y: H + 40 },
+          { x: -40, y: H + 40 }
+        ]
+      };
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function getSurfaceWorldPoint(surface, u, v) {
+      if (surface === 'leftWall') {
+        return { x: 0.002, y: u * ROOM_D, z: v * ROOM_H };
+      }
+      if (surface === 'rightWall') {
+        return { x: u * ROOM_W, y: 0.002, z: v * ROOM_H };
+      }
+      return { x: u * ROOM_W, y: v * ROOM_D, z: 0.002 };
+    }
+
+    function getDecorScreenPolygon(surface, item) {
+      const shape = getShape(item.shapeId);
+      if (!shape) return null;
+
+      const base = getSurfaceWorldPoint(surface, item.u, item.v);
+      const points = shape.points.map(([px, py]) => {
+        const rotated = rotateScreen(px * item.scale, py * item.scale, item.rotation);
+
+        if (surface === 'leftWall') {
+          return project({
+            x: base.x,
+            y: clamp(base.y + rotated.x, 0, ROOM_D),
+            z: clamp(base.z - rotated.y, 0, ROOM_H)
+          });
+        }
+
+        if (surface === 'rightWall') {
+          return project({
+            x: clamp(base.x + rotated.x, 0, ROOM_W),
+            y: base.y,
+            z: clamp(base.z - rotated.y, 0, ROOM_H)
+          });
+        }
+
+        return project({
+          x: clamp(base.x + rotated.x, 0, ROOM_W),
+          y: clamp(base.y + rotated.y, 0, ROOM_D),
+          z: base.z
+        });
+      });
+
+      return points;
+    }
+
+    function clipToPolygon(points) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.closePath();
+      ctx.clip();
+    }
+
+    function generateRoomDecor() {
+      const patterns = { leftWall: [], rightWall: [], floor: [] };
+      const noiseBands = [];
+
+      Object.entries(DECOR_PATTERN_COUNTS).forEach(([surface, count]) => {
+        const margin = DECOR_SURFACE_MARGINS[surface];
+        for (let i = 0; i < count; i++) {
+          patterns[surface].push({
+            shapeId: choice(SHAPES).id,
+            u: rand(margin.uMin, margin.uMax),
+            v: rand(margin.vMin, margin.vMax),
+            rotation: rand(0, 360),
+            scale: DECOR_PATTERN_BASE_SCALE + rand(-DECOR_PATTERN_JITTER, DECOR_PATTERN_JITTER) * (surface === 'floor' ? 1.1 : 1),
+            alphaScale: rand(0.8, 1.22)
+          });
+        }
+      });
+
+      const bandSurfaces = shuffle(['leftWall', 'rightWall', 'floor', choice(['leftWall', 'floor']), choice(['rightWall', 'floor'])]);
+      for (let i = 0; i < DYNAMIC_NOISE_BANDS; i++) {
+        noiseBands.push({
+          surface: bandSurfaces[i],
+          axis: Math.random() < 0.5 ? 'u' : 'v',
+          width: rand(0.16, 0.28),
+          travel: rand(0.12, 0.24),
+          secondaryTravel: rand(-0.08, 0.08),
+          speed: rand(0.35, 0.78),
+          phase: rand(0, Math.PI * 2),
+          tint: Math.random() < 0.55 ? 'cool' : 'warm',
+          alpha: rand(0.055, 0.11)
+        });
+      }
+
+      return { patterns, noiseBands };
+    }
+
+    function drawWallpaper(surface, clipPoly) {
+      if (!roomDecor || !roomDecor.patterns || !roomDecor.patterns[surface]) return;
+
+      ctx.save();
+      clipToPolygon(clipPoly);
+      const style = DECOR_PATTERN_STYLE[surface];
+      for (const item of roomDecor.patterns[surface]) {
+        const poly = getDecorScreenPolygon(surface, item);
+        if (!poly || poly.length < 3) continue;
+        const alpha = Math.min(style.alpha * item.alphaScale, 0.14);
+        const fill = 'rgba(' + style.r + ', ' + style.g + ', ' + style.b + ', ' + alpha.toFixed(3) + ')';
+        drawPolygon(poly, fill, 'rgba(255, 255, 255, 0.04)', 0.8);
+      }
+      ctx.restore();
+    }
+
+    function getBandPolygon(surface, band, timeSeconds) {
+      const motion = timeSeconds * band.speed + band.phase;
+      const center = 0.5 + Math.sin(motion) * band.travel;
+      const drift = Math.cos(motion * 0.83 + band.phase) * band.secondaryTravel;
+      const low = center - band.width * 0.5;
+      const high = center + band.width * 0.5;
+      let uvPoints;
+
+      if (band.axis === 'u') {
+        uvPoints = [
+          { u: low, v: 0.00 + drift },
+          { u: high, v: 0.06 + drift },
+          { u: high, v: 1.00 + drift },
+          { u: low, v: 0.94 + drift }
+        ];
+      } else {
+        uvPoints = [
+          { u: 0.00 + drift, v: low },
+          { u: 1.00 + drift, v: low },
+          { u: 0.94 + drift, v: high },
+          { u: 0.06 + drift, v: high }
+        ];
+      }
+
+      return uvPoints.map(point => {
+        const world = getSurfaceWorldPoint(surface, point.u, point.v);
+        return project({
+          x: clamp(world.x, 0, ROOM_W),
+          y: clamp(world.y, 0, ROOM_D),
+          z: clamp(world.z, 0, ROOM_H)
+        });
+      });
+    }
+
+    function drawAnimatedNoise(surface, clipPoly) {
+      if (!roomDecor || !roomDecor.noiseBands) return;
+
+      ctx.save();
+      clipToPolygon(clipPoly);
+      const timeSeconds = ambientAnimationTime / 1000;
+
+      for (const band of roomDecor.noiseBands) {
+        if (band.surface !== surface) continue;
+        const poly = getBandPolygon(surface, band, timeSeconds);
+        if (!poly || poly.length < 3) continue;
+
+        const gradient = ctx.createLinearGradient(poly[0].x, poly[0].y, poly[2].x, poly[2].y);
+        if (band.tint === 'cool') {
+          gradient.addColorStop(0, 'rgba(153, 185, 255, 0)');
+          gradient.addColorStop(0.5, 'rgba(153, 185, 255, ' + band.alpha.toFixed(3) + ')');
+          gradient.addColorStop(1, 'rgba(153, 185, 255, 0)');
+        } else {
+          gradient.addColorStop(0, 'rgba(255, 244, 205, 0)');
+          gradient.addColorStop(0.5, 'rgba(255, 244, 205, ' + (band.alpha * 0.92).toFixed(3) + ')');
+          gradient.addColorStop(1, 'rgba(255, 244, 205, 0)');
+        }
+
+        drawPolygon(poly, gradient);
+      }
+
+      ctx.restore();
+    }
+
+    function drawReferenceGuides() {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(82, 102, 135, 0.10)';
+      ctx.lineWidth = 1;
+
+      const guideLines = [
+        ['leftWall', { u: 0.14, v: 0.34 }, { u: 0.86, v: 0.34 }],
+        ['leftWall', { u: 0.18, v: 0.62 }, { u: 0.82, v: 0.62 }],
+        ['rightWall', { u: 0.14, v: 0.30 }, { u: 0.86, v: 0.30 }],
+        ['rightWall', { u: 0.18, v: 0.58 }, { u: 0.82, v: 0.58 }],
+        ['floor', { u: 0.20, v: 0.16 }, { u: 0.20, v: 0.82 }],
+        ['floor', { u: 0.48, v: 0.12 }, { u: 0.48, v: 0.82 }],
+        ['floor', { u: 0.76, v: 0.10 }, { u: 0.76, v: 0.80 }]
+      ];
+
+      for (const guide of guideLines) {
+        const surface = guide[0];
+        const start = guide[1];
+        const end = guide[2];
+        const a = project(getSurfaceWorldPoint(surface, start.u, start.v));
+        const b = project(getSurfaceWorldPoint(surface, end.u, end.v));
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
     function drawRoom() {
       ctx.clearRect(0, 0, W, H);
 
@@ -918,45 +1174,32 @@
       const cornerFloor = ROOM_DRAWING.cornerFloor;
       const leftFloor = ROOM_DRAWING.leftFloor;
       const rightFloor = ROOM_DRAWING.rightFloor;
-
-      const leftWall = [
-        { x: -40, y: -40 },
-        { x: cornerTop.x, y: cornerTop.y },
-        { x: cornerFloor.x, y: cornerFloor.y },
-        { x: leftFloor.x, y: leftFloor.y },
-        { x: -40, y: H + 40 }
-      ];
-
-      const rightWall = [
-        { x: cornerTop.x, y: cornerTop.y },
-        { x: W + 40, y: -40 },
-        { x: W + 40, y: H + 40 },
-        { x: rightFloor.x, y: rightFloor.y },
-        { x: cornerFloor.x, y: cornerFloor.y }
-      ];
-
-      const floor = [
-        leftFloor,
-        cornerFloor,
-        rightFloor,
-        { x: W + 40, y: H + 40 },
-        { x: -40, y: H + 40 }
-      ];
+      const surfaces = getRoomSurfacePolygons();
 
       const leftGrad = ctx.createLinearGradient(0, 0, cornerFloor.x, cornerFloor.y);
       leftGrad.addColorStop(0, '#f5f7fb');
       leftGrad.addColorStop(1, '#eef1f6');
-      drawPolygon(leftWall, leftGrad);
+      drawPolygon(surfaces.leftWall, leftGrad);
 
       const rightGrad = ctx.createLinearGradient(cornerTop.x, 0, W, rightFloor.y);
       rightGrad.addColorStop(0, '#eef2f7');
       rightGrad.addColorStop(1, '#e6ebf3');
-      drawPolygon(rightWall, rightGrad);
+      drawPolygon(surfaces.rightWall, rightGrad);
 
       const floorGrad = ctx.createLinearGradient(0, cornerFloor.y, 0, H);
       floorGrad.addColorStop(0, '#e7ebf2');
       floorGrad.addColorStop(1, '#dde4ee');
-      drawPolygon(floor, floorGrad);
+      drawPolygon(surfaces.floor, floorGrad);
+
+      drawWallpaper('leftWall', surfaces.leftWall);
+      drawWallpaper('rightWall', surfaces.rightWall);
+      drawWallpaper('floor', surfaces.floor);
+
+      drawAnimatedNoise('leftWall', surfaces.leftWall);
+      drawAnimatedNoise('rightWall', surfaces.rightWall);
+      drawAnimatedNoise('floor', surfaces.floor);
+
+      drawReferenceGuides();
 
       ctx.strokeStyle = '#111';
       ctx.lineWidth = 4;
@@ -1484,7 +1727,10 @@
     }
 
     function createLight() {
-      const makers = shuffle([solveTopLight, solveLeftLight, solveRightLight]);
+      const makers = Math.random() < 0.7
+        ? shuffle([solveLeftLight, solveRightLight, solveTopLight])
+        : shuffle([solveTopLight, solveLeftLight, solveRightLight]);
+
       for (const maker of makers) {
         const candidate = maker();
         if (candidate) return candidate;
@@ -1499,8 +1745,8 @@
       return planes.length >= 1;
     }
 
-    function createTarget(shapeId) {
-      for (let attempt = 0; attempt < 180; attempt++) {
+    function createTarget(shapeId, minSurfaceCount = 1, maxAttempts = 180) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const candidate = {
           shapeId,
           x: rand(0.45, 3.55),
@@ -1511,6 +1757,7 @@
         const shadow = getShadowPolygon(candidate, false);
         if (!shadow) continue;
         if (!shadowDirectionOK(shadow, light.side)) continue;
+        if (shadow.planes.length < minSurfaceCount) continue;
 
         const area = polygonArea(shadow.points);
         if (area < TARGET_SHADOW_MIN_AREA) continue;
@@ -1550,6 +1797,7 @@
       activeDragPointerId = null;
       pointerDragged = false;
       suppressCanvasClick = false;
+      roomDecor = generateRoomDecor();
       canvas.classList.remove('dragging');
       submitBtn.disabled = gameEnded;
       submitBtn.hidden = false;
@@ -1559,7 +1807,10 @@
         light = createLight();
         objects = makeObjects();
         const chosen = choice(objects);
-        target = createTarget(chosen.shapeId);
+        const preferMultiSurface = Math.random() < TARGET_MULTI_SURFACE_PREFERRED_RATIO;
+        target = preferMultiSurface
+          ? createTarget(chosen.shapeId, 2, TARGET_MULTI_SURFACE_ATTEMPTS) || createTarget(chosen.shapeId, 1, 180)
+          : createTarget(chosen.shapeId, 1, 180);
         if (target && target.shadow) ready = true;
       }
 
@@ -1575,7 +1826,7 @@
         const fallbackShadow = getShadowPolygon(fallback, false);
         target = fallbackShadow
           ? { ...fallback, shadow: fallbackShadow }
-          : createTarget(objects[0].shapeId);
+          : createTarget(objects[0].shapeId, 1, 180);
       }
 
       updateAttempts();
@@ -1857,8 +2108,23 @@
 
     window.addEventListener('blur', stopRotationHold);
 
+    function ambientAnimationLoop(timestamp) {
+      if (!lastAmbientFrameTime || timestamp - lastAmbientFrameTime >= AMBIENT_ANIMATION_FRAME_MS) {
+        ambientAnimationTime = timestamp;
+        lastAmbientFrameTime = timestamp;
+        render();
+      }
+      window.requestAnimationFrame(ambientAnimationLoop);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      render();
+    });
+
     submitBtn.addEventListener('click', checkSolution);
     resetPuzzle();
+    window.requestAnimationFrame(ambientAnimationLoop);
   </script>
 </body>
 </html>
