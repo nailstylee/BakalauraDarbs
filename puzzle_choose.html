@@ -786,6 +786,7 @@
       baselineOrder: CONFIG.STUDY_STORAGE_PREFIX + ':baselineOrder',
       results: CONFIG.STUDY_STORAGE_PREFIX + ':results',
       prototypeRound: CONFIG.STUDY_STORAGE_PREFIX + ':prototypeRound',
+      prototypeComparison: CONFIG.STUDY_STORAGE_PREFIX + ':prototypeComparison',
       sessionId: CONFIG.STUDY_STORAGE_PREFIX + ':sessionId',
       submitted: CONFIG.STUDY_STORAGE_PREFIX + ':submitted'
     };
@@ -794,6 +795,7 @@
       removeStoredValue(storageKeys.baselineOrder);
       removeStoredValue(storageKeys.results);
       removeStoredValue(storageKeys.prototypeRound);
+      removeStoredValue(storageKeys.prototypeComparison);
       removeStoredValue(storageKeys.sessionId);
       removeStoredValue(storageKeys.submitted);
     }

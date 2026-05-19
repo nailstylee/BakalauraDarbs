@@ -365,6 +365,92 @@
       line-height: 1.5;
     }
 
+    .completion-card.rating-card {
+      text-align: left;
+    }
+
+    .completion-card.rating-card h1,
+    .completion-card.rating-card > p {
+      text-align: center;
+    }
+
+    .rating-fieldset {
+      margin: 0;
+      padding: 18px;
+      border: 1px solid var(--border);
+      background: rgba(246, 248, 255, 0.94);
+    }
+
+    .rating-fieldset legend {
+      padding: 0 8px;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.45;
+      font-weight: 760;
+    }
+
+    .rating-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .rating-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #d8e0ef;
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1.4;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+    }
+
+    .rating-option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(63, 114, 247, 0.55);
+      box-shadow: 0 9px 22px rgba(34, 49, 82, 0.09);
+    }
+
+    .rating-option input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      accent-color: var(--primary);
+      cursor: pointer;
+      flex: 0 0 auto;
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+
+    .rating-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 520px) {
+      .completion-card.rating-card {
+        padding: 24px 18px;
+      }
+
+      .rating-fieldset {
+        padding: 14px;
+      }
+
+      .rating-option {
+        padding: 11px 12px;
+      }
+
+      .rating-actions .primary {
+        width: 100%;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -455,6 +541,7 @@
       baselineOrder: STUDY_CONFIG.STORAGE_PREFIX + ':baselineOrder',
       results: STUDY_CONFIG.STORAGE_PREFIX + ':results',
       prototypeRound: STUDY_CONFIG.STORAGE_PREFIX + ':prototypeRound',
+      prototypeComparison: STUDY_CONFIG.STORAGE_PREFIX + ':prototypeComparison',
       sessionId: STUDY_CONFIG.STORAGE_PREFIX + ':sessionId',
       submitted: STUDY_CONFIG.STORAGE_PREFIX + ':submitted'
     };
@@ -525,6 +612,39 @@
       writeStoredJson(studyStorageKeys.prototypeRound, round);
     }
 
+    const PROTOTYPE_COMPARISON_OPTIONS = Object.freeze({
+      1: 'daudz vieglāks',
+      2: 'vieglāks',
+      3: 'līdzīgs',
+      4: 'grūtāks',
+      5: 'daudz grūtāks'
+    });
+
+    function normalizePrototypeComparison(rawValue) {
+      const rating = Number(rawValue && rawValue.rating !== undefined ? rawValue.rating : rawValue);
+      if (!Number.isInteger(rating) || !PROTOTYPE_COMPARISON_OPTIONS[rating]) {
+        return null;
+      }
+
+      return {
+        rating: rating,
+        label: PROTOTYPE_COMPARISON_OPTIONS[rating]
+      };
+    }
+
+    function loadPrototypeComparison() {
+      return normalizePrototypeComparison(
+        readStoredJson(studyStorageKeys.prototypeComparison, null)
+      );
+    }
+
+    function savePrototypeComparison(rating) {
+      const comparison = normalizePrototypeComparison(rating);
+      if (!comparison) return null;
+      writeStoredJson(studyStorageKeys.prototypeComparison, comparison);
+      return comparison;
+    }
+
     function getOrCreateSessionId() {
       try {
         let sessionId = sessionStorage.getItem(studyStorageKeys.sessionId);
@@ -555,6 +675,7 @@
 
     if (studyUrlParams.get('resetPrototype') === '1') {
       removeStoredValue(studyStorageKeys.prototypeRound);
+      removeStoredValue(studyStorageKeys.prototypeComparison);
       removeStoredValue(studyStorageKeys.submitted);
     }
 
@@ -2315,6 +2436,14 @@
         return Promise.resolve(false);
       }
 
+      const prototypeComparison = loadPrototypeComparison();
+      if (!prototypeComparison) {
+        if (statusElement) {
+          statusElement.textContent = 'Rezultāti nav nosūtīti, jo nav sniegts noslēguma vērtējums.';
+        }
+        return Promise.resolve(false);
+      }
+
       if (hasSubmittedResults()) {
         if (statusElement) {
           statusElement.textContent = 'Rezultāti jau ir nosūtīti.';
@@ -2333,6 +2462,8 @@
         submittedAt: new Date().toISOString(),
         sequenceMode: 'baseline-random-then-prototype-random',
         studyOrder: fullStudyOrder,
+        prototypeComparisonRating: prototypeComparison.rating,
+        prototypeComparisonLabel: prototypeComparison.label,
         results: results
       };
 
@@ -2364,6 +2495,57 @@
         });
     }
 
+    function showPrototypeComparisonScreen() {
+      document.title = 'Noslēguma vērtējums';
+      document.body.innerHTML =
+        '<div class="completion-screen">' +
+          '<div class="completion-card rating-card">' +
+            '<h1>Noslēguma vērtējums</h1>' +
+            '<p>Pirms rezultātu iesniegšanas novērtē izstrādāto ēnu uzdevumu salīdzinājumā ar iepriekšējiem bāzes uzdevumiem.</p>' +
+            '<fieldset class="rating-fieldset">' +
+              '<legend>Cik grūts Tev šķita izstrādātais ēnu uzdevums salīdzinājumā ar bāzes uzdevumiem?</legend>' +
+              '<div class="rating-options">' +
+                '<label class="rating-option"><input type="radio" name="prototypeComparison" value="1"><span>1. daudz vieglāks</span></label>' +
+                '<label class="rating-option"><input type="radio" name="prototypeComparison" value="2"><span>2. vieglāks</span></label>' +
+                '<label class="rating-option"><input type="radio" name="prototypeComparison" value="3"><span>3. līdzīgs</span></label>' +
+                '<label class="rating-option"><input type="radio" name="prototypeComparison" value="4"><span>4. grūtāks</span></label>' +
+                '<label class="rating-option"><input type="radio" name="prototypeComparison" value="5"><span>5. daudz grūtāks</span></label>' +
+              '</div>' +
+            '</fieldset>' +
+            '<div class="rating-actions">' +
+              '<button id="submitPrototypeComparisonBtn" class="primary" type="button" disabled>Iesniegt vērtējumu</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      const submitComparisonBtn = document.getElementById('submitPrototypeComparisonBtn');
+      const ratingInputs = Array.from(document.querySelectorAll('input[name="prototypeComparison"]'));
+      const storedComparison = loadPrototypeComparison();
+
+      if (storedComparison) {
+        const selected = ratingInputs.find(function(input) {
+          return Number(input.value) === storedComparison.rating;
+        });
+        if (selected) selected.checked = true;
+        if (submitComparisonBtn) submitComparisonBtn.disabled = false;
+      }
+
+      ratingInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+          if (submitComparisonBtn) submitComparisonBtn.disabled = false;
+        });
+      });
+
+      if (submitComparisonBtn) {
+        submitComparisonBtn.addEventListener('click', function() {
+          const selected = ratingInputs.find(function(input) { return input.checked; });
+          if (!selected) return;
+          savePrototypeComparison(Number(selected.value));
+          showStudyCompletionScreen();
+        });
+      }
+    }
+
     function showStudyCompletionScreen() {
       document.title = 'Pētījums pabeigts';
       document.body.innerHTML =
@@ -2386,7 +2568,7 @@
 
     function continuePrototypeStudy() {
       if (prototypeRound >= STUDY_CONFIG.PROTOTYPE_TASK_COUNT) {
-        showStudyCompletionScreen();
+        showPrototypeComparisonScreen();
         return;
       }
 
@@ -2405,7 +2587,11 @@
     });
 
     if (storedPrototypeResults.length >= STUDY_CONFIG.PROTOTYPE_TASK_COUNT) {
-      showStudyCompletionScreen();
+      if (loadPrototypeComparison() || hasSubmittedResults()) {
+        showStudyCompletionScreen();
+      } else {
+        showPrototypeComparisonScreen();
+      }
     } else {
       resetPuzzle();
       window.requestAnimationFrame(ambientAnimationLoop);
