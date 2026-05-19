@@ -735,6 +735,9 @@
 
     const TARGET_SHADOW_MAX_SURFACES = 2;
 
+    const TARGET_SHADOW_VISUAL_SURFACE_SAMPLE_GRID = 25;
+    const TARGET_SHADOW_MIN_VISUAL_SURFACE_SAMPLES = 2;
+
     const TARGET_SHADOW_FILL = 'rgba(15, 20, 31, 0.66)';
     const TARGET_SHADOW_STROKE = 'rgba(15, 20, 31, 0.14)';
     const PREVIEW_SHADOW_FILL = 'rgba(79, 128, 255, 0.34)';
@@ -1081,6 +1084,42 @@
         if (intersect) inside = !inside;
       }
       return inside;
+    }
+
+    function visuallyCoveredRoomSurfaceCount(shadow) {
+      if (!shadow || !shadow.points || shadow.points.length < 3) return 0;
+
+      const bounds = polygonBounds(shadow.points);
+      const width = Math.max(0.0001, bounds.maxX - bounds.minX);
+      const height = Math.max(0.0001, bounds.maxY - bounds.minY);
+      const gridSize = TARGET_SHADOW_VISUAL_SURFACE_SAMPLE_GRID;
+      const surfaces = getRoomSurfacePolygons();
+      const sampleCounts = { leftWall: 0, rightWall: 0, floor: 0 };
+
+      for (let row = 0; row < gridSize; row++) {
+        const y = bounds.minY + ((row + 0.5) / gridSize) * height;
+
+        for (let col = 0; col < gridSize; col++) {
+          const x = bounds.minX + ((col + 0.5) / gridSize) * width;
+          const point = { x, y };
+
+          if (!pointInPolygon(point, shadow.points)) continue;
+
+          if (pointInPolygon(point, surfaces.leftWall)) {
+            sampleCounts.leftWall += 1;
+          }
+          if (pointInPolygon(point, surfaces.rightWall)) {
+            sampleCounts.rightWall += 1;
+          }
+          if (pointInPolygon(point, surfaces.floor)) {
+            sampleCounts.floor += 1;
+          }
+        }
+      }
+
+      return Object.values(sampleCounts).filter(function(count) {
+        return count >= TARGET_SHADOW_MIN_VISUAL_SURFACE_SAMPLES;
+      }).length;
     }
 
     function pointToSegmentDistance(point, a, b) {
@@ -2048,6 +2087,9 @@
 
         if (shadow.planes.length > TARGET_SHADOW_MAX_SURFACES) continue;
 
+
+        if (visuallyCoveredRoomSurfaceCount(shadow) > TARGET_SHADOW_MAX_SURFACES) continue;
+
         if (shadow.planes.length > 1) {
           const foldedSurfaceElongation = foldedSurfaceElongationForTarget(candidate);
           if (foldedSurfaceElongation > TARGET_SHADOW_MAX_SURFACE_ELONGATION) continue;
@@ -2102,7 +2144,7 @@
           rotation: 0
         };
         const fallbackShadow = getShadowPolygon(fallback, false);
-        target = fallbackShadow
+        target = fallbackShadow && visuallyCoveredRoomSurfaceCount(fallbackShadow) <= TARGET_SHADOW_MAX_SURFACES
           ? { ...fallback, shadow: fallbackShadow }
           : createTarget(objects[0].shapeId, 1, 180);
       }
