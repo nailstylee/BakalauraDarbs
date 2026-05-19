@@ -689,6 +689,7 @@
       SEQUENCE_MODE: 'ordered',
 
       STUDY_STORAGE_PREFIX: 'captchaResearchIndexedV1',
+      RESULT_RECEIVER_URL: 'https://script.google.com/macros/s/AKfycbwwkKK5dTlgb_rKcJeP9mI1dIBQFagwzXhvbazYyENMmp0on5kG8s1VqE6Pr4Rbhb2N/exec',
 
       TEXT: {
         folder: './text/',
@@ -1874,22 +1875,97 @@
       link.remove();
       URL.revokeObjectURL(downloadUrl);
     }
+    function getOrCreateSessionId() {
+      const key = CONFIG.STUDY_STORAGE_PREFIX + ':sessionId';
+
+      try {
+        let sessionId = sessionStorage.getItem(key);
+
+        if (!sessionId) {
+          sessionId =
+            'session_' +
+            new Date().toISOString().replace(/[:.]/g, '-') +
+            '_' +
+            Math.random().toString(36).slice(2, 10);
+
+          sessionStorage.setItem(key, sessionId);
+        }
+
+        return sessionId;
+      } catch (error) {
+        return 'session_' + Date.now();
+      }
+    }
+
+    function submitResultsToGoogleSheets() {
+      const url = CONFIG.RESULT_RECEIVER_URL;
+
+      if (!url || url.includes('TE_IEKOPĒ')) {
+        console.warn('Google Sheets result receiver URL is not configured.');
+        return Promise.resolve(false);
+      }
+
+      const results = loadStoredResults();
+
+      const payload = {
+        sessionId: getOrCreateSessionId(),
+        submittedAt: new Date().toISOString(),
+        sequenceMode: sequenceMode,
+        studyOrder: studyOrder,
+        results: results
+      };
+
+      const body = new URLSearchParams();
+      body.set('payload', JSON.stringify(payload));
+
+      return fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString(),
+        keepalive: true
+      })
+        .then(function () {
+          return true;
+        })
+        .catch(function (error) {
+          console.error('Result submission failed:', error);
+          return false;
+        });
+    }
 
     function showCompletionScreen() {
       document.title = 'Pētījums pabeigts';
+
       document.body.innerHTML =
         '<div class="completion-screen">' +
           '<div class="completion-card">' +
             '<h1>Paldies, ka piedalījies pētījumā!</h1>' +
-            '<p>Spied zemāk lai lejupielādētu rezultātus</p>' +
+            '<p id="submissionStatus">Rezultāti tiek nosūtīti...</p>' +
             '<button id="downloadResultsBtn" class="primary" type="button">Lejupielādēt rezultātus</button>' +
           '</div>' +
         '</div>';
 
       const downloadResultsBtn = document.getElementById('downloadResultsBtn');
+      const submissionStatus = document.getElementById('submissionStatus');
+
       if (downloadResultsBtn) {
         downloadResultsBtn.addEventListener('click', downloadResultsCsv);
       }
+
+      submitResultsToGoogleSheets().then(function(sent) {
+        if (!submissionStatus) return;
+
+        if (sent) {
+          submissionStatus.textContent =
+            'Rezultāti ir nosūtīti. Spied zemāk, ja vēlies lejupielādēt arī savu rezultātu kopiju.';
+        } else {
+          submissionStatus.textContent =
+            'Automātiska nosūtīšana neizdevās. Spied zemāk, lai lejupielādētu rezultātus un nosūtītu tos pētniekam manuāli.';
+        }
+      });
     }
 
     function continueToNextTask() {
