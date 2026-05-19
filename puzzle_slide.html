@@ -597,6 +597,42 @@
         font-size: 17px;
       }
     }
+
+    .result-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .completion-screen {
+      width: min(100%, 720px);
+      display: grid;
+      place-items: center;
+    }
+
+    .completion-card {
+      width: 100%;
+      padding: 34px;
+      border: 1px solid rgba(215, 223, 239, 0.97);
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 22px 68px rgba(34, 49, 82, 0.17);
+      text-align: center;
+    }
+
+    .completion-card h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      line-height: 1.25;
+      font-weight: 820;
+    }
+
+    .completion-card p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
   </style>
 </head>
 <body>
@@ -634,8 +670,11 @@
           <div class="result-icon" id="resultIcon">✓</div>
           <div class="result-copy">
             <h2 id="resultTitle">Pārbaude veiksmīga</h2>
-            <p id="resultMessage">Tu esi uzvarējis!</p>
+            <p id="resultMessage" hidden></p>
           </div>
+        </div>
+        <div class="result-actions">
+          <button id="nextTaskBtn" class="primary" type="button">Nākamais uzdevums</button>
         </div>
       </div>
     </div>
@@ -644,16 +683,18 @@
   <script>
     const CONFIG = {
       ATTEMPTS_PER_ROUND: 3,
-      MAX_FAILED_ROUNDS: 2,
-      ALLOWED_TYPES: [
-        'slide'
-      ],
+
+      // Nomaini uz 'random', ja pētījumā uzdevumu secībai jābūt nejaušai.
+      // Uzdevuma saturs arī tad paliek pilnībā deterministisks pēc indeksa.
+      SEQUENCE_MODE: 'ordered',
+
+      STUDY_STORAGE_PREFIX: 'captchaResearchIndexedV1',
 
       TEXT: {
         folder: './text/',
         manifest: 'files.js',
         manifestKey: 'text',
-        prompt: 'Ieraksti attēlā redzamo tekstu.',
+        prompt: 'Attēlā redzams izkropļots teksts. Ieraksti to zemāk esošajā laukā, ko to redzi, un pēc tam spied “Pārbaudīt”.',
         caseSensitive: false
       },
 
@@ -666,32 +707,62 @@
         canvasHeight: 470,
         pieceSize: 96,
         holeMargin: 42,
-        tolerancePx: 14
+        tolerancePx: 14,
+        fixedLayoutsByVariant: {
+          1: { pieceY: 118, targetX: 212 },
+          2: { pieceY: 184, targetX: 356 },
+          3: { pieceY: 248, targetX: 276 },
+          4: { pieceY: 154, targetX: 438 }
+        }
       },
 
       CHOOSE: {
         folder: './choose/',
         manifest: 'files.js',
         manifestKey: 'choose',
-        prompt: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms.',
-        correctPrefix: 'correct',
-        wrongPrefix: 'wrong',
-        correctCounts: [4, 5]
+        promptsByVariant: {
+          1: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          2: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          3: 'Atzīmē visus laukumus, kuros redzams velosipēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          4: 'Atzīmē visus laukumus, kuros redzama sarkana mašīna. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.'
+        }
       },
 
       COVER: {
         folder: './cover/',
         manifest: 'files.js',
         manifestKey: 'cover',
-        promptFile: 'prompt.txt',
-        fallbackPrompt: 'Atzīmē visus laukumus, kas atbilst norādei.'
-      },
-
-      CHECKBOX: {
-        prompt: 'Atzīmē rūtiņu, lai turpinātu.',
-        label: 'Apstiprinu izvēli'
+        promptsByVariant: {
+          1: 'Atzīmē visus laukumus, kuros ietilpst mopēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          2: 'Atzīmē visus laukumus, kuros ietilpst velosipēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          3: 'Atzīmē visus laukumus, kuros ietilpst velosipēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          4: 'Atzīmē visus laukumus, kuros ietilpst mopēdi. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.'
+        }
       }
     };
+
+    const TASK_CATALOG = Object.freeze({
+      1:  { index: 1,  type: 'text',   variant: 1, page: 'puzzle_text.html' },
+      2:  { index: 2,  type: 'text',   variant: 2, page: 'puzzle_text.html' },
+      3:  { index: 3,  type: 'text',   variant: 3, page: 'puzzle_text.html' },
+      4:  { index: 4,  type: 'text',   variant: 4, page: 'puzzle_text.html' },
+      5:  { index: 5,  type: 'slide',  variant: 1, page: 'puzzle_slide.html' },
+      6:  { index: 6,  type: 'slide',  variant: 2, page: 'puzzle_slide.html' },
+      7:  { index: 7,  type: 'slide',  variant: 3, page: 'puzzle_slide.html' },
+      8:  { index: 8,  type: 'slide',  variant: 4, page: 'puzzle_slide.html' },
+      9:  { index: 9,  type: 'choose', variant: 1, page: 'puzzle_choose.html' },
+      10: { index: 10, type: 'choose', variant: 2, page: 'puzzle_choose.html' },
+      11: { index: 11, type: 'choose', variant: 3, page: 'puzzle_choose.html' },
+      12: { index: 12, type: 'choose', variant: 4, page: 'puzzle_choose.html' },
+      13: { index: 13, type: 'cover',  variant: 1, page: 'puzzle_cover.html' },
+      14: { index: 14, type: 'cover',  variant: 2, page: 'puzzle_cover.html' },
+      15: { index: 15, type: 'cover',  variant: 3, page: 'puzzle_cover.html' },
+      16: { index: 16, type: 'cover',  variant: 4, page: 'puzzle_cover.html' }
+    });
+
+    const ALL_TASK_INDICES = Object.freeze(
+      Object.keys(TASK_CATALOG).map(function(value) { return Number(value); })
+    );
 
     const stage = document.getElementById('challengeStage');
     const startupFallback = document.getElementById('startupFallback');
@@ -703,31 +774,100 @@
     const resultIcon = document.getElementById('resultIcon');
     const resultTitle = document.getElementById('resultTitle');
     const resultMessage = document.getElementById('resultMessage');
+    const nextTaskBtn = document.getElementById('nextTaskBtn');
 
     if (startupFallback) {
       startupFallback.classList.add('hidden');
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const sequenceMode = resolveSequenceMode();
+    const storageKeys = {
+      order: CONFIG.STUDY_STORAGE_PREFIX + ':order:' + sequenceMode,
+      results: CONFIG.STUDY_STORAGE_PREFIX + ':results:' + sequenceMode
+    };
+
+    if (urlParams.get('reset') === '1') {
+      removeStoredValue(storageKeys.order);
+      removeStoredValue(storageKeys.results);
+    }
+
+    let studyOrder = loadOrCreateStudyOrder();
     let currentChallenge = null;
+    let currentTask = null;
+    let currentTaskIndex = null;
+    let currentTaskStartedAt = null;
     let attemptsUsed = 0;
-    let failedRounds = 0;
     let gameEnded = false;
     let generationId = 0;
 
-    function rand(min, max) {
-      return Math.random() * (max - min) + min;
+    function resolveSequenceMode() {
+      const requested = String(urlParams.get('order') || '').trim().toLowerCase();
+      if (requested === 'ordered' || requested === 'random') {
+        return requested;
+      }
+
+      const configured = String(CONFIG.SEQUENCE_MODE || 'ordered').trim().toLowerCase();
+      return configured === 'random' ? 'random' : 'ordered';
     }
 
-    function randInt(min, max) {
-      return Math.floor(rand(min, max + 1));
+    function parseTaskIndex(rawValue) {
+      const value = Number(rawValue);
+      return Number.isInteger(value) && TASK_CATALOG[value] ? value : null;
     }
 
-    function choice(list) {
-      return list[Math.floor(Math.random() * list.length)];
+    function currentPageFileName() {
+      const raw = window.location.pathname.split('/').pop() || '';
+      try {
+        return decodeURIComponent(raw);
+      } catch (error) {
+        return raw;
+      }
     }
 
-    function shuffle(list) {
-      const copy = list.slice();
+    function normalizeStoredOrder(order) {
+      if (!Array.isArray(order) || order.length !== ALL_TASK_INDICES.length) {
+        return null;
+      }
+
+      const values = order.map(function(value) { return Number(value); });
+      const valid = values.every(function(value) {
+        return Number.isInteger(value) && Boolean(TASK_CATALOG[value]);
+      });
+
+      if (!valid || new Set(values).size !== ALL_TASK_INDICES.length) {
+        return null;
+      }
+
+      return values;
+    }
+
+    function readStoredJson(key, fallbackValue) {
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return fallbackValue;
+        return JSON.parse(raw);
+      } catch (error) {
+        return fallbackValue;
+      }
+    }
+
+    function writeStoredJson(key, value) {
+      try {
+        sessionStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+      }
+    }
+
+    function removeStoredValue(key) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch (error) {
+      }
+    }
+
+    function shuffleTaskIndices(indices) {
+      const copy = indices.slice();
       for (let i = copy.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         const temp = copy[i];
@@ -737,12 +877,95 @@
       return copy;
     }
 
-    function sample(list, count) {
-      return shuffle(list).slice(0, count);
+    function loadOrCreateStudyOrder() {
+      const stored = normalizeStoredOrder(readStoredJson(storageKeys.order, null));
+      if (stored) return stored;
+
+      const created = sequenceMode === 'random'
+        ? shuffleTaskIndices(ALL_TASK_INDICES)
+        : ALL_TASK_INDICES.slice();
+
+      writeStoredJson(storageKeys.order, created);
+      return created;
     }
 
-    function uniqueValues(list) {
-      return Array.from(new Set(list));
+    function loadStoredResults() {
+      const raw = readStoredJson(storageKeys.results, []);
+      if (!Array.isArray(raw)) return [];
+
+      return raw.filter(function(item) {
+        return item &&
+          Number.isInteger(Number(item.taskIndex)) &&
+          Boolean(TASK_CATALOG[Number(item.taskIndex)]);
+      });
+    }
+
+    function saveStoredResults(results) {
+      writeStoredJson(storageKeys.results, results);
+    }
+
+    function upsertStoredResult(result) {
+      const results = loadStoredResults().filter(function(item) {
+        return Number(item.taskIndex) !== Number(result.taskIndex);
+      });
+
+      results.push(result);
+      saveStoredResults(results);
+      return results;
+    }
+
+    function completedTaskIndexSet(results) {
+      return new Set(results.map(function(item) { return Number(item.taskIndex); }));
+    }
+
+    function allTasksCompleted(results) {
+      const completed = completedTaskIndexSet(results);
+      return ALL_TASK_INDICES.every(function(index) { return completed.has(index); });
+    }
+
+    function firstIncompleteTaskIndex(results) {
+      const completed = completedTaskIndexSet(results);
+      for (let i = 0; i < studyOrder.length; i++) {
+        if (!completed.has(studyOrder[i])) {
+          return studyOrder[i];
+        }
+      }
+      return null;
+    }
+
+    function taskPositionInSequence(taskIndex) {
+      const position = studyOrder.indexOf(taskIndex);
+      return position >= 0 ? position + 1 : '';
+    }
+
+    function buildTaskUrl(taskIndex) {
+      const task = TASK_CATALOG[taskIndex];
+      const params = new URLSearchParams();
+      params.set('index', String(taskIndex));
+      params.set('order', sequenceMode);
+      return task.page + '?' + params.toString();
+    }
+
+    function redirectToCorrectTaskPage(taskIndex) {
+      const task = TASK_CATALOG[taskIndex];
+      if (!task) return false;
+
+      if (currentPageFileName() !== task.page) {
+        window.location.replace(buildTaskUrl(taskIndex));
+        return true;
+      }
+
+      return false;
+    }
+
+    function determineInitialTaskIndex() {
+      const explicit = parseTaskIndex(urlParams.get('index') || urlParams.get('task'));
+      if (explicit) return explicit;
+
+      const results = loadStoredResults();
+      if (allTasksCompleted(results)) return null;
+
+      return firstIncompleteTaskIndex(results) || studyOrder[0] || 1;
     }
 
     function setStatus(text, kind) {
@@ -855,28 +1078,11 @@
       return promise;
     }
 
-    async function loadOptionalText(folder, fileName) {
-      const url = normalizePath(folder, fileName);
-      try {
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) return null;
-        const text = await response.text();
-        const trimmed = text.trim();
-        return trimmed || null;
-      } catch (error) {
-        return null;
-      }
-    }
-
     function loadImage(url) {
       return new Promise(function(resolve, reject) {
         const image = new Image();
-        image.onload = function() {
-          resolve(image);
-        };
-        image.onerror = function() {
-          reject(new Error('Image failed to load: ' + url));
-        };
+        image.onload = function() { resolve(image); };
+        image.onerror = function() { reject(new Error('Image failed to load: ' + url)); };
         image.src = url;
       });
     }
@@ -889,20 +1095,33 @@
       return true;
     }
 
-    function parseCoverFile(fileName) {
-      const match = /^(1[0-6]|[1-9])_(correct|wrong)(?:[_.-]|$)/i.exec(baseName(fileName));
+    function parseChooseFile(fileName) {
+      const match = /^([1-9])_(correct|wrong)_([1-4])$/i.exec(fileStem(fileName));
       if (!match) return null;
 
       return {
-        index: Number(match[1]),
+        cellIndex: Number(match[1]),
         correct: match[2].toLowerCase() === 'correct',
+        variant: Number(match[3]),
         fileName: fileName
       };
     }
 
-    async function createCoverChallenge(localGenerationId) {
+    function parseCoverFile(fileName) {
+      const match = /^(1[0-6]|[1-9])_(correct|wrong)_([1-4])$/i.exec(fileStem(fileName));
+      if (!match) return null;
+
+      return {
+        cellIndex: Number(match[1]),
+        correct: match[2].toLowerCase() === 'correct',
+        variant: Number(match[3]),
+        fileName: fileName
+      };
+    }
+
+    async function createCoverChallenge(localGenerationId, task) {
       const setup = CONFIG.COVER;
-      setInstructions(setup.fallbackPrompt);
+      setInstructions(setup.promptsByVariant[task.variant] || '');
       showLoading('Attēli tiek ielādēti.');
 
       let files = [];
@@ -912,27 +1131,24 @@
         if (localGenerationId !== generationId || gameEnded) return;
         showStageMessage(
           'Trūkst cover failu saraksta.',
-          'Pievieno cover/files.js ar 16 attēlu failu nosaukumiem.'
+          'Pievieno cover/files.js ar attēlu failu nosaukumiem.'
         );
         setStatus('Nav ielādēta attēlu kopa.', 'bad');
         return;
       }
 
-      const prompt = await loadOptionalText(setup.folder, setup.promptFile);
-      if (prompt) {
-        setInstructions(prompt);
-      }
-
       if (localGenerationId !== generationId || gameEnded) return;
 
-      const parsed = files
+      const variantFiles = files
         .map(parseCoverFile)
-        .filter(function(item) { return Boolean(item); });
+        .filter(function(item) {
+          return Boolean(item) && item.variant === task.variant;
+        });
 
       const byIndex = new Map();
-      parsed.forEach(function(item) {
-        if (!byIndex.has(item.index)) {
-          byIndex.set(item.index, item);
+      variantFiles.forEach(function(item) {
+        if (!byIndex.has(item.cellIndex)) {
+          byIndex.set(item.cellIndex, item);
         }
       });
 
@@ -940,8 +1156,8 @@
       for (let index = 1; index <= 16; index++) {
         if (!byIndex.has(index)) {
           showStageMessage(
-            'Cover kopa nav pilna.',
-            'Failu nosaukumiem jāiet no 1 līdz 16, piemēram, 1_correct.jpg vai 14_wrong.png.'
+            'Cover variants nav pilns.',
+            'Variantam _' + task.variant + ' vajag failus ar laukumiem no 1 līdz 16.'
           );
           setStatus('Nepilnīga attēlu kopa.', 'bad');
           return;
@@ -956,14 +1172,14 @@
             .then(function(image) {
               return {
                 image: image,
-                index: item.index,
+                index: item.cellIndex,
                 correct: item.correct
               };
             })
             .catch(function() {
               return {
                 image: null,
-                index: item.index,
+                index: item.cellIndex,
                 correct: item.correct,
                 missing: true
               };
@@ -976,7 +1192,7 @@
       if (loaded.some(function(item) { return item.missing; })) {
         showStageMessage(
           'Daži cover attēli nav atrasti.',
-          'Pārbaudi cover/files.js un failu nosaukumus.'
+          'Pārbaudi cover/files.js un failu nosaukumus variantam _' + task.variant + '.'
         );
         setStatus('Nepilnīga attēlu kopa.', 'bad');
         return;
@@ -1022,7 +1238,7 @@
       stage.innerHTML = '';
       stage.appendChild(grid);
 
-      setStatus('Atzīmē visus atbilstošos laukumus.', 'neutral');
+      setStatus('Atzīmē visus pareizos laukumus.', 'neutral');
       setReadyChallenge({
         type: 'cover',
         validate: function() {
@@ -1031,9 +1247,9 @@
       });
     }
 
-    async function createChooseChallenge(localGenerationId) {
+    async function createChooseChallenge(localGenerationId, task) {
       const setup = CONFIG.CHOOSE;
-      setInstructions(setup.prompt);
+      setInstructions(setup.promptsByVariant[task.variant] || '');
       showLoading('Attēli tiek ielādēti.');
 
       let files = [];
@@ -1043,7 +1259,7 @@
         if (localGenerationId !== generationId || gameEnded) return;
         showStageMessage(
           'Trūkst choose failu saraksta.',
-          'Pievieno choose/files.js ar pareizo un nepareizo attēlu failu nosaukumiem.'
+          'Pievieno choose/files.js ar attēlu failu nosaukumiem.'
         );
         setStatus('Nav ielādēta attēlu kopa.', 'bad');
         return;
@@ -1051,60 +1267,50 @@
 
       if (localGenerationId !== generationId || gameEnded) return;
 
-      const correctPrefix = String(setup.correctPrefix || 'correct').toLowerCase();
-      const wrongPrefix = String(setup.wrongPrefix || 'wrong').toLowerCase();
+      const variantFiles = files
+        .map(parseChooseFile)
+        .filter(function(item) {
+          return Boolean(item) && item.variant === task.variant;
+        });
 
-      const correctFiles = uniqueValues(files.filter(function(file) {
-        return fileStem(file).toLowerCase().startsWith(correctPrefix);
-      }));
-
-      const wrongFiles = uniqueValues(files.filter(function(file) {
-        return fileStem(file).toLowerCase().startsWith(wrongPrefix);
-      }));
-
-      const allowedCorrectCounts = (setup.correctCounts || [4, 5]).filter(function(value) {
-        return value > 0 &&
-          value < 9 &&
-          correctFiles.length >= value &&
-          wrongFiles.length >= 9 - value;
+      const byIndex = new Map();
+      variantFiles.forEach(function(item) {
+        if (!byIndex.has(item.cellIndex)) {
+          byIndex.set(item.cellIndex, item);
+        }
       });
 
-      if (!allowedCorrectCounts.length) {
-        showStageMessage(
-          'Choose kopa nav līdzsvarota.',
-          'Vajag pietiekami daudz correct... un wrong... failu, lai izveidotu 9 laukumu uzdevumu.'
-        );
-        setStatus('Nepietiek līdzsvarotu attēlu.', 'bad');
-        return;
+      const ordered = [];
+      for (let index = 1; index <= 9; index++) {
+        if (!byIndex.has(index)) {
+          showStageMessage(
+            'Choose variants nav pilns.',
+            'Variantam _' + task.variant + ' vajag failus ar laukumiem no 1 līdz 9.'
+          );
+          setStatus('Nepilnīga attēlu kopa.', 'bad');
+          return;
+        }
+        ordered.push(byIndex.get(index));
       }
 
-      const correctCount = choice(allowedCorrectCounts);
-      const wrongCount = 9 - correctCount;
-
-      const cells = shuffle(
-        sample(correctFiles, correctCount).map(function(file) {
-          return {
-            url: normalizePath(setup.folder, file),
-            correct: true
-          };
-        }).concat(
-          sample(wrongFiles, wrongCount).map(function(file) {
-            return {
-              url: normalizePath(setup.folder, file),
-              correct: false
-            };
-          })
-        )
-      );
-
       const loaded = await Promise.all(
-        cells.map(function(cell) {
-          return loadImage(cell.url)
+        ordered.map(function(item) {
+          const url = normalizePath(setup.folder, item.fileName);
+          return loadImage(url)
             .then(function(image) {
-              return { image: image, correct: cell.correct, url: cell.url };
+              return {
+                image: image,
+                index: item.cellIndex,
+                correct: item.correct
+              };
             })
             .catch(function() {
-              return { image: null, correct: cell.correct, url: cell.url, missing: true };
+              return {
+                image: null,
+                index: item.cellIndex,
+                correct: item.correct,
+                missing: true
+              };
             });
         })
       );
@@ -1113,8 +1319,8 @@
 
       if (loaded.some(function(item) { return item.missing; })) {
         showStageMessage(
-          'Daži attēli nav atrasti.',
-          'Pārbaudi choose/files.js un failu nosaukumus.'
+          'Daži choose attēli nav atrasti.',
+          'Pārbaudi choose/files.js un failu nosaukumus variantam _' + task.variant + '.'
         );
         setStatus('Nepilnīga attēlu kopa.', 'bad');
         return;
@@ -1125,38 +1331,39 @@
       const grid = document.createElement('div');
       grid.className = 'image-grid';
 
-      loaded.forEach(function(item, index) {
-        const oneBasedIndex = index + 1;
-        if (item.correct) correct.add(oneBasedIndex);
+      loaded
+        .sort(function(a, b) { return a.index - b.index; })
+        .forEach(function(item) {
+          if (item.correct) correct.add(item.index);
 
-        const cell = document.createElement('button');
-        cell.type = 'button';
-        cell.className = 'image-cell';
-        cell.dataset.index = String(oneBasedIndex);
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'image-cell';
+          cell.dataset.index = String(item.index);
 
-        const image = document.createElement('img');
-        image.src = item.image.src;
-        image.alt = '';
-        cell.appendChild(image);
+          const image = document.createElement('img');
+          image.src = item.image.src;
+          image.alt = '';
+          cell.appendChild(image);
 
-        cell.addEventListener('click', function() {
-          const value = Number(cell.dataset.index);
-          if (selected.has(value)) {
-            selected.delete(value);
-            cell.classList.remove('selected');
-          } else {
-            selected.add(value);
-            cell.classList.add('selected');
-          }
+          cell.addEventListener('click', function() {
+            const value = Number(cell.dataset.index);
+            if (selected.has(value)) {
+              selected.delete(value);
+              cell.classList.remove('selected');
+            } else {
+              selected.add(value);
+              cell.classList.add('selected');
+            }
+          });
+
+          grid.appendChild(cell);
         });
-
-        grid.appendChild(cell);
-      });
 
       stage.innerHTML = '';
       stage.appendChild(grid);
 
-      setStatus('Atzīmē visus laukumus, kas atbilst norādei.', 'neutral');
+      setStatus('Atzīmē visus pareizos laukumus.', 'neutral');
       setReadyChallenge({
         type: 'choose',
         validate: function() {
@@ -1165,54 +1372,66 @@
       });
     }
 
-    function drawCover(ctx, image, width, height) {
+    function drawCover(ctx, image, targetWidth, targetHeight) {
       const imageRatio = image.width / image.height;
-      const canvasRatio = width / height;
-      let drawWidth = width;
-      let drawHeight = height;
-      let drawX = 0;
-      let drawY = 0;
+      const targetRatio = targetWidth / targetHeight;
 
-      if (imageRatio > canvasRatio) {
-        drawHeight = height;
-        drawWidth = height * imageRatio;
-        drawX = (width - drawWidth) / 2;
+      let drawWidth = targetWidth;
+      let drawHeight = targetHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imageRatio > targetRatio) {
+        drawHeight = targetHeight;
+        drawWidth = drawHeight * imageRatio;
+        offsetX = (targetWidth - drawWidth) / 2;
       } else {
-        drawWidth = width;
-        drawHeight = width / imageRatio;
-        drawY = (height - drawHeight) / 2;
+        drawWidth = targetWidth;
+        drawHeight = drawWidth / imageRatio;
+        offsetY = (targetHeight - drawHeight) / 2;
       }
 
-      ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
     }
 
     function drawPiecePath(ctx, x, y, size) {
-      const notch = size * 0.18;
-      const half = size * 0.5;
-      const q = size * 0.25;
+      const radius = size * 0.18;
+      const bumpRadius = size * 0.15;
+      const bumpCenterX = x + size * 0.52;
+      const bumpCenterY = y - bumpRadius * 0.1;
+      const notchCenterX = x + size * 0.96;
+      const notchCenterY = y + size * 0.55;
 
       ctx.beginPath();
-      ctx.moveTo(x, y + q);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x + q, y);
-      ctx.bezierCurveTo(x + q, y - notch, x + half - notch, y - notch, x + half, y);
-      ctx.bezierCurveTo(x + half + notch, y - notch, x + size - q, y - notch, x + size - q, y);
-      ctx.lineTo(x + size, y);
-      ctx.lineTo(x + size, y + q);
-      ctx.bezierCurveTo(x + size + notch, y + q, x + size + notch, y + half - notch, x + size, y + half);
-      ctx.bezierCurveTo(x + size + notch, y + half + notch, x + size + notch, y + size - q, x + size, y + size - q);
-      ctx.lineTo(x + size, y + size);
-      ctx.lineTo(x + size - q, y + size);
-      ctx.bezierCurveTo(x + size - q, y + size + notch, x + half + notch, y + size + notch, x + half, y + size);
-      ctx.bezierCurveTo(x + half - notch, y + size + notch, x + q, y + size + notch, x + q, y + size);
-      ctx.lineTo(x, y + size);
-      ctx.lineTo(x, y + size - q);
-      ctx.bezierCurveTo(x - notch, y + size - q, x - notch, y + half + notch, x, y + half);
-      ctx.bezierCurveTo(x - notch, y + half - notch, x - notch, y + q, x, y + q);
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(bumpCenterX - bumpRadius, y);
+      ctx.bezierCurveTo(
+        bumpCenterX - bumpRadius * 0.85, y - bumpRadius * 0.92,
+        bumpCenterX + bumpRadius * 0.85, y - bumpRadius * 0.92,
+        bumpCenterX + bumpRadius, y
+      );
+      ctx.lineTo(x + size - radius, y);
+      ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+      ctx.lineTo(x + size, notchCenterY - bumpRadius);
+      ctx.bezierCurveTo(
+        x + size + bumpRadius * 0.92, notchCenterY - bumpRadius * 0.82,
+        x + size + bumpRadius * 0.92, notchCenterY + bumpRadius * 0.82,
+        x + size, notchCenterY + bumpRadius
+      );
+      ctx.lineTo(x + size, y + size - radius);
+      ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+      ctx.lineTo(x + radius, y + size);
+      ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
     }
 
-    async function createSliderChallenge(localGenerationId) {
+    function clampNumber(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    async function createSliderChallenge(localGenerationId, task) {
       const setup = CONFIG.SLIDE;
       setInstructions(setup.prompt);
       showLoading('Attēls tiek ielādēts.');
@@ -1229,34 +1448,28 @@
 
       if (localGenerationId !== generationId || gameEnded) return;
 
-      if (!files.length) {
-        showStageMessage('Slide kopa ir tukša.', 'Pievieno vismaz vienu attēlu slide/files.js sarakstā.');
+      const file = files[task.variant - 1];
+      if (!file) {
+        showStageMessage(
+          'Slide variants nav atrasts.',
+          'Indeksam ' + task.index + ' vajag ' + task.variant + '. failu slide/files.js sarakstā.'
+        );
         setStatus('Nav atrasts attēls.', 'bad');
         return;
       }
 
       let image = null;
-      let chosenPath = null;
-      const shuffledFiles = shuffle(files.map(function(file) {
-        return normalizePath(setup.folder, file);
-      }));
-
-      for (let i = 0; i < shuffledFiles.length; i++) {
-        try {
-          image = await loadImage(shuffledFiles[i]);
-          chosenPath = shuffledFiles[i];
-          break;
-        } catch (error) {
-        }
-      }
-
-      if (localGenerationId !== generationId || gameEnded) return;
-
-      if (!image) {
-        showStageMessage('Attēls nav atrasts.', 'Pārbaudi slide/files.js un failu nosaukumus.');
+      const chosenPath = normalizePath(setup.folder, file);
+      try {
+        image = await loadImage(chosenPath);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage('Attēls nav atrasts.', 'Pārbaudi slide/files.js un faila nosaukumu.');
         setStatus('Nav ielādēts attēls.', 'bad');
         return;
       }
+
+      if (localGenerationId !== generationId || gameEnded) return;
 
       const layout = document.createElement('div');
       layout.className = 'slide-layout';
@@ -1301,10 +1514,15 @@
 
       const pieceSize = setup.pieceSize;
       const holeMargin = setup.holeMargin;
-      const pieceY = randInt(holeMargin + 18, canvas.height - pieceSize - holeMargin - 18);
-      const targetX = randInt(holeMargin + pieceSize, canvas.width - pieceSize - holeMargin);
+      const minPieceY = holeMargin + 18;
+      const maxPieceY = canvas.height - pieceSize - holeMargin - 18;
+      const minTargetX = holeMargin + pieceSize;
+      const maxTargetX = canvas.width - pieceSize - holeMargin;
       const minPieceX = holeMargin;
       const maxPieceX = canvas.width - pieceSize - holeMargin;
+      const fixedLayout = setup.fixedLayoutsByVariant[task.variant] || setup.fixedLayoutsByVariant[1];
+      const pieceY = clampNumber(fixedLayout.pieceY, minPieceY, maxPieceY);
+      const targetX = clampNumber(fixedLayout.targetX, minTargetX, maxTargetX);
 
       function pieceXFromSlider() {
         const ratio = Number(slider.value) / 1000;
@@ -1362,10 +1580,10 @@
     }
 
     function answerFromImagePath(path) {
-      return decodeURIComponent(fileStem(path));
+      return fileStem(path);
     }
 
-    async function createTextImageChallenge(localGenerationId) {
+    async function createTextImageChallenge(localGenerationId, task) {
       const setup = CONFIG.TEXT;
       setInstructions(setup.prompt);
       showLoading('Attēls tiek ielādēts.');
@@ -1382,34 +1600,28 @@
 
       if (localGenerationId !== generationId || gameEnded) return;
 
-      if (!files.length) {
-        showStageMessage('Text kopa ir tukša.', 'Pievieno vismaz vienu attēlu text/files.js sarakstā.');
+      const file = files[task.variant - 1];
+      if (!file) {
+        showStageMessage(
+          'Text variants nav atrasts.',
+          'Indeksam ' + task.index + ' vajag ' + task.variant + '. failu text/files.js sarakstā.'
+        );
         setStatus('Nav atrasts attēls.', 'bad');
         return;
       }
 
+      const chosenPath = normalizePath(setup.folder, file);
       let image = null;
-      let chosenPath = null;
-      const shuffledFiles = shuffle(files.map(function(file) {
-        return normalizePath(setup.folder, file);
-      }));
-
-      for (let i = 0; i < shuffledFiles.length; i++) {
-        try {
-          image = await loadImage(shuffledFiles[i]);
-          chosenPath = shuffledFiles[i];
-          break;
-        } catch (error) {
-        }
-      }
-
-      if (localGenerationId !== generationId || gameEnded) return;
-
-      if (!image) {
-        showStageMessage('Attēls nav atrasts.', 'Pārbaudi text/files.js un failu nosaukumus.');
+      try {
+        image = await loadImage(chosenPath);
+      } catch (error) {
+        if (localGenerationId !== generationId || gameEnded) return;
+        showStageMessage('Attēls nav atrasts.', 'Pārbaudi text/files.js un faila nosaukumu.');
         setStatus('Nav ielādēts attēls.', 'bad');
         return;
       }
+
+      if (localGenerationId !== generationId || gameEnded) return;
 
       const answer = answerFromImagePath(chosenPath);
       const layout = document.createElement('div');
@@ -1457,93 +1669,95 @@
       });
     }
 
-    function createCheckboxChallenge() {
-      const setup = CONFIG.CHECKBOX;
-      setInstructions(setup.prompt);
-
-      const layout = document.createElement('div');
-      layout.className = 'check-layout';
-
-      const panel = document.createElement('div');
-      panel.className = 'check-panel';
-
-      const label = document.createElement('label');
-      label.className = 'check-label';
-
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.className = 'check-input';
-
-      const text = document.createElement('span');
-      text.textContent = setup.label;
-
-      label.appendChild(input);
-      label.appendChild(text);
-      panel.appendChild(label);
-      layout.appendChild(panel);
-
-      stage.innerHTML = '';
-      stage.appendChild(layout);
-
-      setStatus('Atzīmē rūtiņu un spied “Pārbaudīt”.', 'neutral');
-      setReadyChallenge({
-        type: 'checkbox',
-        validate: function() {
-          return input.checked;
-        }
-      });
-    }
-
-    async function createRandomChallenge(localGenerationId) {
-      const allowed = CONFIG.ALLOWED_TYPES || [];
-      if (!allowed.length) {
-        showStageMessage('Nav konfigurētu uzdevumu.', 'Pievieno vismaz vienu uzdevuma tipu.');
-        setStatus('Nav pieejamu uzdevumu.', 'bad');
+    async function createIndexedChallenge(localGenerationId, task) {
+      if (!task) {
+        showStageMessage('Uzdevuma indekss nav derīgs.', 'Izmanto indeksu no 1 līdz 16.');
+        setStatus('Uzdevumu nevar ielādēt.', 'bad');
         return;
       }
 
-      const type = choice(allowed);
-
-      if (type === 'cover') {
-        await createCoverChallenge(localGenerationId);
+      if (task.type === 'cover') {
+        await createCoverChallenge(localGenerationId, task);
         return;
       }
 
-      if (type === 'choose') {
-        await createChooseChallenge(localGenerationId);
+      if (task.type === 'choose') {
+        await createChooseChallenge(localGenerationId, task);
         return;
       }
 
-      if (type === 'slide') {
-        await createSliderChallenge(localGenerationId);
+      if (task.type === 'slide') {
+        await createSliderChallenge(localGenerationId, task);
         return;
       }
 
-      if (type === 'text') {
-        await createTextImageChallenge(localGenerationId);
+      if (task.type === 'text') {
+        await createTextImageChallenge(localGenerationId, task);
         return;
       }
 
-      if (type === 'checkbox') {
-        createCheckboxChallenge();
-        return;
-      }
-
-      showStageMessage('Nezināms uzdevuma tips.', 'Pārbaudi CONFIG.ALLOWED_TYPES vērtības.');
+      showStageMessage('Nezināms uzdevuma tips.', 'Pārbaudi TASK_CATALOG konfigurāciju.');
       setStatus('Uzdevumu nevar ielādēt.', 'bad');
     }
 
-    function startNewRound(message) {
+    function startIndexedRound(taskIndex, message) {
+      currentTaskIndex = taskIndex;
+      currentTask = TASK_CATALOG[taskIndex] || null;
       attemptsUsed = 0;
       currentChallenge = null;
+      gameEnded = false;
       submitBtn.disabled = true;
       updateAttempts();
+      currentTaskStartedAt = Date.now();
+
+      if (currentTask) {
+        document.title = 'Uzdevums ' + currentTask.index;
+      }
+
       setStatus(message || 'Uzdevums tiek sagatavots.', 'neutral');
       generationId += 1;
-      createRandomChallenge(generationId);
+      createIndexedChallenge(generationId, currentTask);
     }
 
-    function showResultModal(isHuman) {
+    function sequencePositionForResult(taskIndex) {
+      const position = studyOrder.indexOf(taskIndex);
+      return position >= 0 ? position + 1 : '';
+    }
+
+    function recordCurrentResult(isHuman) {
+      const endedAtMs = Date.now();
+      const durationMs = currentTaskStartedAt ? Math.max(0, endedAtMs - currentTaskStartedAt) : '';
+      const attemptsMade = isHuman ? attemptsUsed + 1 : attemptsUsed;
+
+      return upsertStoredResult({
+        taskIndex: currentTask.index,
+        taskType: currentTask.type,
+        variant: currentTask.variant,
+        success: Boolean(isHuman),
+        attemptsMade: attemptsMade,
+        durationMs: durationMs,
+        completedAt: new Date(endedAtMs).toISOString(),
+        sequenceMode: sequenceMode,
+        sequencePosition: sequencePositionForResult(currentTask.index)
+      });
+    }
+
+    function nextIncompleteTaskAfterCurrent(results) {
+      const completed = completedTaskIndexSet(results);
+      const currentPosition = studyOrder.indexOf(currentTaskIndex);
+
+      if (currentPosition >= 0) {
+        for (let i = currentPosition + 1; i < studyOrder.length; i++) {
+          if (!completed.has(studyOrder[i])) {
+            return studyOrder[i];
+          }
+        }
+      }
+
+      return firstIncompleteTaskIndex(results);
+    }
+
+    function showResultModal(isHuman, results) {
       resultModal.classList.toggle('failure', !isHuman);
       resultModal.classList.add('visible');
       resultModal.setAttribute('aria-hidden', 'false');
@@ -1551,25 +1765,28 @@
       if (isHuman) {
         resultIcon.textContent = '✓';
         resultTitle.textContent = 'Pārbaude veiksmīga';
-        resultMessage.textContent = 'Tu esi uzvarējis!';
       } else {
         resultIcon.textContent = '×';
         resultTitle.textContent = 'Pārbaude neizdevās';
-        resultMessage.textContent = 'Tu neesi uzvarējis!';
       }
+
+      resultMessage.hidden = true;
+      nextTaskBtn.textContent = allTasksCompleted(results) ? 'Skatīt rezultātus' : 'Nākamais uzdevums';
     }
 
     function endGame(isHuman) {
+      if (gameEnded) return;
       gameEnded = true;
       submitBtn.disabled = true;
 
       if (isHuman) {
-        setStatus('Tu esi uzvarējis!', 'ok');
+        setStatus('Uzdevums pabeigts.', 'ok');
       } else {
-        setStatus('Tu neesi uzvarējis!', 'bad');
+        setStatus('Uzdevums pabeigts.', 'bad');
       }
 
-      showResultModal(isHuman);
+      const results = recordCurrentResult(isHuman);
+      showResultModal(isHuman, results);
     }
 
     function failAttempt() {
@@ -1603,9 +1820,105 @@
       }
     }
 
-    submitBtn.addEventListener('click', checkCurrentChallenge);
+    function csvEscape(value) {
+      const text = String(value == null ? '' : value);
+      return '"' + text.replace(/"/g, '""') + '"';
+    }
 
-    startNewRound('Uzdevums tiek sagatavots.');
+    function downloadResultsCsv() {
+      const results = loadStoredResults();
+      const byTaskIndex = new Map();
+      results.forEach(function(item) {
+        byTaskIndex.set(Number(item.taskIndex), item);
+      });
+
+      const orderedResults = studyOrder
+        .map(function(taskIndex) { return byTaskIndex.get(taskIndex); })
+        .filter(function(item) { return Boolean(item); });
+
+      const header = [
+        'task_index',
+        'task_type',
+        'variant',
+        'success',
+        'attempts_made',
+        'duration_ms',
+        'completed_at',
+        'sequence_mode',
+        'sequence_position'
+      ];
+
+      const rows = orderedResults.map(function(item) {
+        return [
+          item.taskIndex,
+          item.taskType,
+          item.variant,
+          item.success,
+          item.attemptsMade,
+          item.durationMs,
+          item.completedAt,
+          item.sequenceMode,
+          item.sequencePosition
+        ].map(csvEscape).join(',');
+      });
+
+      const csv = '\uFEFF' + header.map(csvEscape).join(',') + '\r\n' + rows.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = downloadUrl;
+      link.download = 'petijuma_rezultati_' + timestamp + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    }
+
+    function showCompletionScreen() {
+      document.title = 'Pētījums pabeigts';
+      document.body.innerHTML =
+        '<div class="completion-screen">' +
+          '<div class="completion-card">' +
+            '<h1>Paldies, ka piedalījies pētījumā!</h1>' +
+            '<p>Spied zemāk lai lejupielādētu rezultātus</p>' +
+            '<button id="downloadResultsBtn" class="primary" type="button">Lejupielādēt rezultātus</button>' +
+          '</div>' +
+        '</div>';
+
+      const downloadResultsBtn = document.getElementById('downloadResultsBtn');
+      if (downloadResultsBtn) {
+        downloadResultsBtn.addEventListener('click', downloadResultsCsv);
+      }
+    }
+
+    function continueToNextTask() {
+      const results = loadStoredResults();
+
+      if (allTasksCompleted(results)) {
+        showCompletionScreen();
+        return;
+      }
+
+      const nextTaskIndex = nextIncompleteTaskAfterCurrent(results);
+      if (!nextTaskIndex) {
+        showCompletionScreen();
+        return;
+      }
+
+      window.location.href = buildTaskUrl(nextTaskIndex);
+    }
+
+    submitBtn.addEventListener('click', checkCurrentChallenge);
+    nextTaskBtn.addEventListener('click', continueToNextTask);
+
+    const initialTaskIndex = determineInitialTaskIndex();
+    if (!initialTaskIndex) {
+      showCompletionScreen();
+    } else if (!redirectToCorrectTaskPage(initialTaskIndex)) {
+      startIndexedRound(initialTaskIndex, 'Uzdevums tiek sagatavots.');
+    }
   </script>
+
 </body>
 </html>
