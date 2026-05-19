@@ -695,7 +695,7 @@
         folder: './text/',
         manifest: 'files.js',
         manifestKey: 'text',
-        prompt: 'Attēlā redzams izkropļots teksts. Ieraksti to zemāk esošajā laukā, ko to redzi, un pēc tam spied “Pārbaudīt”.',
+        prompt: 'Attēlā redzams izkropļots teksts. Ieraksti to zemāk esošajā laukā un pēc tam spied “Pārbaudīt”.',
         caseSensitive: false
       },
 
@@ -722,8 +722,8 @@
         manifest: 'files.js',
         manifestKey: 'choose',
         promptsByVariant: {
-          1: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
-          2: 'Atzīmē visus laukumus, kuros redzams dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          1: 'Atzīmē visus laukumus, kuros redzamais galvenais objekts ir dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
+          2: 'Atzīmē visus laukumus, kuros redzamais galvenais objekts ir dzīvs organisms. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
           3: 'Atzīmē visus laukumus, kuros redzams velosipēds. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.',
           4: 'Atzīmē visus laukumus, kuros redzama sarkana mašīna. Kad esi izvēlējies visus pareizos laukumus, spied “Pārbaudīt”.'
         }
@@ -1006,6 +1006,11 @@
 
     function setReadyChallenge(challenge) {
       currentChallenge = challenge;
+
+      if (!currentTaskStartedAt) {
+        currentTaskStartedAt = Date.now();
+      }
+
       submitBtn.disabled = false;
     }
 
@@ -1709,7 +1714,7 @@
       gameEnded = false;
       submitBtn.disabled = true;
       updateAttempts();
-      currentTaskStartedAt = Date.now();
+      currentTaskStartedAt = null;
 
       if (currentTask) {
         document.title = 'Uzdevums ' + currentTask.index;
