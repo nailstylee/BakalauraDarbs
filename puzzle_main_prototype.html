@@ -329,6 +329,42 @@
       }
 
     }
+
+    .result-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .completion-screen {
+      width: min(100%, 720px);
+      display: grid;
+      place-items: center;
+    }
+
+    .completion-card {
+      width: 100%;
+      padding: 34px;
+      border: 1px solid rgba(215, 223, 239, 0.97);
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 22px 68px rgba(34, 49, 82, 0.17);
+      text-align: center;
+    }
+
+    .completion-card h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+      line-height: 1.25;
+      font-weight: 820;
+    }
+
+    .completion-card p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
   </style>
 </head>
 <body>
@@ -374,9 +410,11 @@
           <div class="result-icon" id="resultIcon">✓</div>
           <div class="result-copy">
             <h2 id="resultTitle">Pārbaude veiksmīga</h2>
-            <p id="resultMessage">Tu esi uzvarējis!</p>
+            <p id="resultMessage" hidden></p>
           </div>
         </div>
+        <div class="result-actions">
+          <button id="nextPrototypeBtn" class="primary" type="button">Nākamais uzdevums</button>
         </div>
       </div>
     </div>
@@ -405,10 +443,123 @@
     const startupFallback = document.getElementById('startupFallback');
     const resultTitle = document.getElementById('resultTitle');
     const resultMessage = document.getElementById('resultMessage');
+    const nextPrototypeBtn = document.getElementById('nextPrototypeBtn');
+
+    const STUDY_CONFIG = {
+      STORAGE_PREFIX: 'captchaResearchFullStudyV2',
+      RESULT_RECEIVER_URL: 'https://script.google.com/macros/s/AKfycbwwkKK5dTlgb_rKcJeP9mI1dIBQFagwzXhvbazYyENMmp0on5kG8s1VqE6Pr4Rbhb2N/exec',
+      PROTOTYPE_TASK_COUNT: 16
+    };
+
+    const studyStorageKeys = {
+      baselineOrder: STUDY_CONFIG.STORAGE_PREFIX + ':baselineOrder',
+      results: STUDY_CONFIG.STORAGE_PREFIX + ':results',
+      prototypeRound: STUDY_CONFIG.STORAGE_PREFIX + ':prototypeRound',
+      sessionId: STUDY_CONFIG.STORAGE_PREFIX + ':sessionId',
+      submitted: STUDY_CONFIG.STORAGE_PREFIX + ':submitted'
+    };
+
+    const studyUrlParams = new URLSearchParams(window.location.search);
 
     if (startupFallback) {
       startupFallback.classList.add('hidden');
     }
+
+    function readStoredJson(key, fallbackValue) {
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return fallbackValue;
+        return JSON.parse(raw);
+      } catch (error) {
+        return fallbackValue;
+      }
+    }
+
+    function writeStoredJson(key, value) {
+      try {
+        sessionStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {
+      }
+    }
+
+    function removeStoredValue(key) {
+      try {
+        sessionStorage.removeItem(key);
+      } catch (error) {
+      }
+    }
+
+    function loadStoredResults() {
+      const raw = readStoredJson(studyStorageKeys.results, []);
+      return Array.isArray(raw) ? raw : [];
+    }
+
+    function saveStoredResults(results) {
+      writeStoredJson(studyStorageKeys.results, results);
+    }
+
+    function upsertStoredResult(result) {
+      const results = loadStoredResults().filter(function(item) {
+        return Number(item.taskIndex) !== Number(result.taskIndex);
+      });
+      results.push(result);
+      saveStoredResults(results);
+      return results;
+    }
+
+    function getStoredBaselineOrder() {
+      const raw = readStoredJson(studyStorageKeys.baselineOrder, []);
+      if (!Array.isArray(raw)) return [];
+      return raw.map(function(value) { return Number(value); }).filter(function(value) {
+        return Number.isInteger(value) && value >= 1 && value <= 16;
+      });
+    }
+
+    function loadPrototypeRound() {
+      const raw = Number(readStoredJson(studyStorageKeys.prototypeRound, 1));
+      if (!Number.isInteger(raw) || raw < 1) return 1;
+      return Math.min(raw, STUDY_CONFIG.PROTOTYPE_TASK_COUNT);
+    }
+
+    function savePrototypeRound(round) {
+      writeStoredJson(studyStorageKeys.prototypeRound, round);
+    }
+
+    function getOrCreateSessionId() {
+      try {
+        let sessionId = sessionStorage.getItem(studyStorageKeys.sessionId);
+        if (!sessionId) {
+          sessionId = 'session_' + new Date().toISOString().replace(/[:.]/g, '-') + '_' + Math.random().toString(36).slice(2, 10);
+          sessionStorage.setItem(studyStorageKeys.sessionId, sessionId);
+        }
+        return sessionId;
+      } catch (error) {
+        return 'session_' + Date.now();
+      }
+    }
+
+    function hasSubmittedResults() {
+      try {
+        return sessionStorage.getItem(studyStorageKeys.submitted) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function markResultsSubmitted() {
+      try {
+        sessionStorage.setItem(studyStorageKeys.submitted, '1');
+      } catch (error) {
+      }
+    }
+
+    if (studyUrlParams.get('resetPrototype') === '1') {
+      removeStoredValue(studyStorageKeys.prototypeRound);
+      removeStoredValue(studyStorageKeys.submitted);
+    }
+
+    let prototypeRound = loadPrototypeRound();
+    let prototypeTaskStartedAt = null;
 
     const W = canvas.width;
     const H = canvas.height;
@@ -1793,7 +1944,9 @@
 
     function resetPuzzle(message = 'Izvēlies priekšmetu un ievelc to telpā') {
       attemptsUsed = 0;
+      failedPuzzles = 0;
       solved = false;
+      gameEnded = false;
       selectedObjectId = null;
       stopRotationHold();
       shadowContinuity.clear();
@@ -1836,6 +1989,29 @@
       updateAttempts();
       setStatus(message, 'neutral');
       render();
+      prototypeTaskStartedAt = Date.now();
+    }
+
+    function prototypeResultTaskIndex() {
+      return 16 + prototypeRound;
+    }
+
+    function recordPrototypeResult(isHuman) {
+      const endedAtMs = Date.now();
+      const durationMs = prototypeTaskStartedAt ? Math.max(0, endedAtMs - prototypeTaskStartedAt) : '';
+      const attemptsMade = isHuman ? attemptsUsed + 1 : attemptsUsed;
+      return upsertStoredResult({
+        phase: 'prototype',
+        taskIndex: prototypeResultTaskIndex(),
+        taskType: 'prototype',
+        variant: prototypeRound,
+        success: Boolean(isHuman),
+        attemptsMade: attemptsMade,
+        durationMs: durationMs,
+        completedAt: new Date(endedAtMs).toISOString(),
+        sequenceMode: 'prototype-random',
+        sequencePosition: prototypeResultTaskIndex()
+      });
     }
 
     function showResultModal(isHuman) {
@@ -1846,12 +2022,15 @@
       if (isHuman) {
         resultIcon.textContent = '✓';
         resultTitle.textContent = 'Pārbaude veiksmīga';
-        resultMessage.textContent = 'Tu esi uzvarējis!';
       } else {
         resultIcon.textContent = '×';
         resultTitle.textContent = 'Pārbaude neizdevās';
-        resultMessage.textContent = 'Tu neesi uzvarējis!';
       }
+
+      resultMessage.hidden = true;
+      nextPrototypeBtn.textContent = prototypeRound >= STUDY_CONFIG.PROTOTYPE_TASK_COUNT
+        ? 'Pabeigt pētījumu'
+        : 'Nākamais uzdevums';
     }
 
     function endGame(isHuman) {
@@ -1872,6 +2051,7 @@
         setStatus('Tu neesi uzvarējis!', 'bad');
       }
 
+      recordPrototypeResult(isHuman);
       showResultModal(isHuman);
       render();
     }
@@ -2126,9 +2306,110 @@
       render();
     });
 
+    function submitResultsToGoogleSheets(statusElement) {
+      const results = loadStoredResults();
+      if (results.length < 32) {
+        if (statusElement) {
+          statusElement.textContent = 'Rezultāti nav nosūtīti, jo nav atrasti visi bāzes un prototipa uzdevumu dati.';
+        }
+        return Promise.resolve(false);
+      }
+
+      if (hasSubmittedResults()) {
+        if (statusElement) {
+          statusElement.textContent = 'Rezultāti jau ir nosūtīti.';
+        }
+        return Promise.resolve(true);
+      }
+
+      const baselineOrder = getStoredBaselineOrder();
+      const prototypeOrder = Array.from({ length: STUDY_CONFIG.PROTOTYPE_TASK_COUNT }, function(_, index) {
+        return 17 + index;
+      });
+      const fullStudyOrder = baselineOrder.concat(prototypeOrder);
+
+      const payload = {
+        sessionId: getOrCreateSessionId(),
+        submittedAt: new Date().toISOString(),
+        sequenceMode: 'baseline-random-then-prototype-random',
+        studyOrder: fullStudyOrder,
+        results: results
+      };
+
+      const body = new URLSearchParams();
+      body.set('payload', JSON.stringify(payload));
+
+      return fetch(STUDY_CONFIG.RESULT_RECEIVER_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString(),
+        keepalive: true
+      })
+        .then(function() {
+          markResultsSubmitted();
+          if (statusElement) {
+            statusElement.textContent = 'Paldies, rezultāti ir nosūtīti.';
+          }
+          return true;
+        })
+        .catch(function(error) {
+          console.error('Result submission failed:', error);
+          if (statusElement) {
+            statusElement.textContent = 'Rezultātu nosūtīšana neizdevās.';
+          }
+          return false;
+        });
+    }
+
+    function showStudyCompletionScreen() {
+      document.title = 'Pētījums pabeigts';
+      document.body.innerHTML =
+        '<div class="completion-screen">' +
+          '<div class="completion-card">' +
+            '<h1>Paldies, ka piedalījies pētījumā!</h1>' +
+            '<p id="submissionStatus">Rezultāti tiek nosūtīti...</p>' +
+          '</div>' +
+        '</div>';
+
+      const submissionStatus = document.getElementById('submissionStatus');
+      submitResultsToGoogleSheets(submissionStatus);
+    }
+
+    function hideResultModal() {
+      resultModal.classList.remove('visible');
+      resultModal.classList.remove('failure');
+      resultModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function continuePrototypeStudy() {
+      if (prototypeRound >= STUDY_CONFIG.PROTOTYPE_TASK_COUNT) {
+        showStudyCompletionScreen();
+        return;
+      }
+
+      prototypeRound += 1;
+      savePrototypeRound(prototypeRound);
+      hideResultModal();
+      resetPuzzle('Izvēlies priekšmetu un ievelc to telpā');
+    }
+
     submitBtn.addEventListener('click', checkSolution);
-    resetPuzzle();
-    window.requestAnimationFrame(ambientAnimationLoop);
+    nextPrototypeBtn.addEventListener('click', continuePrototypeStudy);
+
+    const storedPrototypeResults = loadStoredResults().filter(function(item) {
+      const taskIndex = Number(item.taskIndex);
+      return taskIndex >= 17 && taskIndex <= 32;
+    });
+
+    if (storedPrototypeResults.length >= STUDY_CONFIG.PROTOTYPE_TASK_COUNT) {
+      showStudyCompletionScreen();
+    } else {
+      resetPuzzle();
+      window.requestAnimationFrame(ambientAnimationLoop);
+    }
   </script>
 </body>
 </html>

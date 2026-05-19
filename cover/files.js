@@ -54,7 +54,7 @@ window.VERIFICATION_FILE_LISTS.cover = [
   "13_wrong_2.png",
   "14_correct_2.png",
   "14_correct_3.png",
-  "14_correct_4.png",
+  "14_wrong_4.png",
   "14_wrong_1.png",
   "15_correct_1.png",
   "15_correct_2.png",

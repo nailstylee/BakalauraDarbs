@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cilvēktestu pētījums</title>
+  <style>
+    :root {
+      --card-w: 820px;
+      --text: #202738;
+      --muted: #697389;
+      --border: #d8e0ef;
+      --primary: #3f72f7;
+      --panel: rgba(255, 255, 255, 0.97);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(91, 123, 255, 0.15), transparent 24%),
+        radial-gradient(circle at 88% 13%, rgba(255, 209, 98, 0.14), transparent 18%),
+        linear-gradient(180deg, #eff3fb, #e7ecf6);
+      font-family: Inter, Arial, sans-serif;
+      color: var(--text);
+    }
+    .landing-card {
+      width: min(100%, var(--card-w));
+      padding: 38px;
+      border: 1px solid rgba(215, 223, 239, 0.97);
+      background: var(--panel);
+      box-shadow: 0 22px 68px rgba(34, 49, 82, 0.17);
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 34px;
+      line-height: 1.2;
+      font-weight: 820;
+    }
+    p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.6;
+    }
+    .details {
+      margin: 22px 0 28px;
+      padding: 18px 20px;
+      border: 1px solid var(--border);
+      background: rgba(246, 248, 255, 0.9);
+    }
+    .details p {
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+    .details p:last-child { margin-bottom: 0; }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 14px 22px;
+      background: var(--primary);
+      color: white;
+      font: inherit;
+      font-size: 17px;
+      font-weight: 760;
+      cursor: pointer;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    @media (max-width: 620px) {
+      body { padding: 12px; }
+      .landing-card { padding: 24px 18px; }
+      h1 { font-size: 28px; }
+      p { font-size: 16px; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="landing-card">
+    <h1>Cilvēktestu risināšanas pētījums</h1>
+    <p>Šī pētījuma mērķis ir salīdzināt, kā cilvēki risina ierastus cilvēktestu uzdevumus un jauna prototipa uzdevumus.</p>
+    <p>Vispirms būs 16 bāzes uzdevumi nejaušā secībā. Pēc tam sekos 16 prototipa uzdevumi ar katru reizi nejauši ģenerētu situāciju.</p>
+    <div class="details">
+      <p>Katram uzdevumam ir 3 mēģinājumi.</p>
+      <p>Tiek saglabāts uzdevuma veids, rezultāts, mēģinājumu skaits un risināšanas laiks.</p>
+      <p>Netiek prasīts vārds, e-pasts vai cita identificējoša informācija.</p>
+    </div>
+    <button id="startStudyBtn" type="button">Sākt pētījumu</button>
+  </main>
+  <script>
+    const startStudyBtn = document.getElementById('startStudyBtn');
+    startStudyBtn.addEventListener('click', function() {
+      window.location.href = 'puzzle_text.html?reset=1&order=random';
+    });
+  </script>
+</body>
+</html>
